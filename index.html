@@ -2,514 +2,1020 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mapa POT — ( UMBRAL ) Lab 2</title>
-<script src="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.js"></script>
-<link href="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.css" rel="stylesheet">
-<script src="https://unpkg.com/pmtiles@3.2.0/dist/pmtiles.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mi terreno en 3D · Lab 2 · UMBRAL</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  display: flex; flex-direction: column; height: 100vh;
-  -webkit-font-smoothing: antialiased;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --black:#0a0a0a;--white:#ffffff;--ground:#f4f4f2;
+  --g100:#f7f7f7;--g200:#efefef;--g300:#e3e3e3;--g400:#cfcfcf;--g500:#9a9a9a;--g600:#6b6b6b;--g700:#4a4a4a;
+  --azul:#2f5bd3;--line:1.5px solid var(--black);--soft:1px solid var(--g300);
+  --font:'Space Grotesk',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --nav-h:54px;--panel:360px;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ color-scheme:light; } }
+:root[data-theme="dark"]{ color-scheme:light; }
+html{height:100%;font-size:14px}
+body{height:100%;overflow:hidden;background:var(--white);color:var(--black);font-family:var(--font);-webkit-font-smoothing:antialiased;line-height:1.45}
+button,input,select{font-family:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--azul);outline-offset:2px}
+#app{display:grid;grid-template-rows:var(--nav-h) 1fr;grid-template-columns:1fr var(--panel);height:100%}
 
-/* ── Nav ────────────────────────────────────────────────────── */
-#header {
-  background: #fff;
-  border-bottom: 1.5px solid #0a0a0a;
-  padding: 0 20px;
-  height: 54px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-  z-index: 2000;
-  gap: 16px;
-}
-.nav-logo {
-  display: flex; align-items: center; gap: 10px;
-  text-decoration: none; color: #0a0a0a;
-  font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
-  white-space: nowrap; flex-shrink: 0;
-  padding-right: 16px; border-right: 1px solid #e8e8e8; height: 100%;
-}
-.nav-links {
-  display: flex; align-items: center; gap: 4px; flex: 1;
-  overflow-x: auto; scrollbar-width: none;
-}
-.nav-links::-webkit-scrollbar { display: none; }
-.nav-link {
-  padding: 6px 12px; font-size: 11px; font-weight: 600;
-  letter-spacing: 0.04em; text-transform: uppercase;
-  color: #888; border-radius: 6px; text-decoration: none;
-  white-space: nowrap; transition: all .15s;
-}
-.nav-link:hover { color: #0a0a0a; background: #f0f0f0; }
-.nav-link.active { color: #0a0a0a; background: #f0f0f0; }
-.nav-back {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 8px 16px; background: #0a0a0a; color: #fff;
-  font-size: 12px; font-weight: 500; border-radius: 8px;
-  text-decoration: none; white-space: nowrap; flex-shrink: 0;
-  transition: opacity .15s;
-}
-.nav-back:hover { opacity: 0.85; }
+/* Barra superior (igual a las otras herramientas de UMBRAL) */
+#nav{grid-column:1/-1;display:flex;align-items:center;gap:16px;padding:0 20px;border-bottom:var(--line);background:var(--white);z-index:20}
+#nav-logo{display:flex;align-items:center;height:100%;padding-right:16px;border-right:var(--soft);font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--black);text-decoration:none;white-space:nowrap}
+#nav-links{display:flex;gap:4px;flex:1;overflow-x:auto}
+.nav-mod{display:flex;align-items:center;height:34px;padding:0 12px;border-radius:6px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--g600);text-decoration:none;white-space:nowrap}
+.nav-mod:hover,.nav-mod.active{color:var(--black);background:var(--g200)}
+.nav-back{margin-left:auto;padding:8px 16px;border-radius:8px;background:var(--black);color:var(--white);font-size:12px;font-weight:500;text-decoration:none;white-space:nowrap}
 
-/* ── Mapa ────────────────────────────────────────────────────── */
-#map { flex: 1; position: relative; }
+/* Vista 3D */
+#vista{position:relative;grid-column:1;grid-row:2;background:var(--ground);overflow:hidden;touch-action:none;border-right:var(--soft)}
+#c{display:block;width:100%;height:100%;cursor:grab}
+#c:active{cursor:grabbing}
+#guias{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.tag{position:absolute;transform:translate(-50%,-50%);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;background:var(--white);color:var(--black);border:1.5px solid var(--black);border-radius:4px;padding:3px 7px;pointer-events:none;z-index:3}
+.tag.neg{background:var(--black);color:var(--white)}
+.tag.acc{border-color:var(--azul);color:var(--azul)}
+.grupo{position:absolute;display:flex;gap:6px;z-index:5}
+#mostrar{top:14px;left:14px;flex-direction:column;align-items:flex-start}
+#vistas{top:14px;right:14px}
+.mini-t{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--g600)}
+.chip{min-height:34px;padding:0 12px;border:1.5px solid var(--g400);border-radius:8px;background:var(--white);font-size:11px;font-weight:600;color:var(--g600)}
+.chip.on{border-color:var(--black);color:var(--black)}
+.chip.sel{background:var(--black);border-color:var(--black);color:var(--white)}
+.chip.icon{width:34px;padding:0;font-size:14px;font-weight:700;color:var(--black);border-color:var(--black)}
+#stepper{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:8px 10px;border:var(--line);border-radius:12px;background:var(--white);z-index:6}
+.big{width:48px;height:48px;border:var(--line);border-radius:8px;background:var(--white);font-size:22px;font-weight:600;line-height:1}
+.big.pri{background:var(--black);color:var(--white)}
+.big:disabled{opacity:.3;cursor:not-allowed}
+#niv{display:flex;flex-direction:column;align-items:center;min-width:112px}
+#niv b{font-size:19px;font-weight:700}
+#niv span{font-size:11px;color:var(--g600)}
+#llenar:disabled{opacity:.35;cursor:not-allowed}
+#btn-mostrar{display:none}
+#llenar{height:48px;padding:0 14px;border:var(--line);border-radius:8px;background:var(--white);font-size:12px;font-weight:600}
+#umbral{position:absolute;left:14px;bottom:96px;width:350px;max-width:calc(100% - 28px);padding:13px 16px;border:var(--line);border-radius:10px;background:var(--white);z-index:6;display:none}
+#umbral.acc{border-color:var(--azul)}
+#umbral p{font-size:13px;line-height:1.5}
+#umbral .x{position:absolute;top:6px;right:8px;border:0;background:none;font-size:14px;color:var(--g600)}
+#sello{position:absolute;right:14px;bottom:18px;padding:5px 8px;border:1px solid var(--g400);border-radius:6px;background:var(--white);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--g600);z-index:4}
+#aviso{position:absolute;top:60px;left:50%;transform:translateX(-50%);max-width:min(520px,90%);padding:9px 14px;border:1px solid var(--g400);border-radius:8px;background:var(--white);font-size:12px;color:var(--g700);z-index:5;display:none;text-align:center}
 
-/* ── Leyenda ─────────────────────────────────────────────────── */
-#legend {
-  position: fixed; bottom: 28px; left: 16px;
-  background: #fff;
-  border: 1.5px solid #0a0a0a;
-  border-radius: 10px; padding: 12px 14px;
-  z-index: 1000; font-size: 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-}
-#legend h3 {
-  font-size: 9px; font-weight: 700; color: #aaa;
-  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px;
-}
-.li {
-  display: flex; align-items: center; gap: 9px;
-  margin-bottom: 6px; color: #0a0a0a; cursor: pointer;
-  font-size: 11px; font-weight: 500;
-  user-select: none; transition: opacity .15s;
-}
-.li:last-child { margin-bottom: 0; }
-.li:hover { opacity: 0.7; }
-.dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; transition: opacity .2s; }
-.li.off .dot { opacity: 0.2; }
-.li.off { color: #bbb; }
+/* Panel */
+#panel{grid-column:2;grid-row:2;display:flex;flex-direction:column;overflow:hidden;background:var(--white)}
+#panel-top{padding:14px 16px;border-bottom:var(--soft);display:flex;flex-direction:column;gap:10px}
+#predio{font-size:12px;color:var(--g700)}
+#scroll{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin}
+.seg{display:flex;border:var(--line);border-radius:8px;overflow:hidden;background:var(--white)}
+.seg button{flex:1;min-height:38px;padding:0 6px;border:0;background:transparent;font-size:12px;font-weight:600}
+.seg button+button{border-left:var(--line)}
+.seg button.sel{background:var(--black);color:var(--white);font-weight:700}
+.seg button:disabled{color:var(--g400);cursor:not-allowed}
+.bloque{display:flex;flex-direction:column;gap:6px}
+.barra{display:flex;height:14px;border:var(--line);border-radius:4px;overflow:hidden;position:relative;background:var(--white)}
+.barra i{display:block;height:100%}
+.barra .marca{position:absolute;top:-2px;bottom:-2px;width:0;border-left:1.5px dashed var(--black)}
+.fila-b{display:flex;justify-content:space-between;font-size:10px;color:var(--g600)}
+.cifras{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.cif{border:var(--soft);border-radius:8px;padding:9px 10px}
+.cif b{display:block;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.cif span{font-size:11px;color:var(--g600)}
+.cif.full{grid-column:span 2;border:var(--line)}
+.cif.full b{font-size:20px}
+.tec{display:none}
+body.tecnico .tec{display:flex}
+body.tecnico .tec.grid{display:grid}
+.campos{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.campo{display:flex;flex-direction:column;gap:4px}
+.campo label{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--g600)}
+.campo input,.campo select{height:36px;padding:0 8px;border:var(--line);border-radius:8px;background:var(--white);font-size:12px;width:100%}
+table.niveles{width:100%;border-collapse:collapse;font-size:11px}
+table.niveles th{text-align:left;font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--g600);padding:5px 4px;background:var(--g200)}
+table.niveles td{padding:5px 4px;border-top:1px solid var(--g300);font-variant-numeric:tabular-nums}
+.tabla-wrap{max-height:190px;overflow:auto;border:var(--soft);border-radius:8px}
+#panel-pie{padding:12px 16px;border-top:var(--soft);display:flex;flex-direction:column;gap:8px}
+.cta{display:flex;justify-content:space-between;align-items:center;min-height:40px;padding:0 12px;border:var(--line);border-radius:8px;background:var(--white);font-size:12px;font-weight:700;color:var(--black);text-decoration:none;width:100%}
+.links{display:flex;justify-content:space-between;font-size:11px}
+.links a,.links button{color:var(--g700);background:none;border:0;font-size:11px;text-decoration:underline}
+.g{border-bottom:1px dotted var(--g600);cursor:help}
 
-/* ── Panel de predio ─────────────────────────────────────────── */
-#panel {
-  position: fixed; top: 68px; right: 14px;
-  background: #fff;
-  border: 1.5px solid #0a0a0a;
-  border-radius: 10px; padding: 16px;
-  z-index: 1000; width: 248px;
-  font-size: 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-}
-#panel h3 {
-  font-size: 9px; font-weight: 700; color: #aaa;
-  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
-}
-.row {
-  display: flex; justify-content: space-between;
-  align-items: baseline; margin-bottom: 6px;
-  padding-bottom: 6px; border-bottom: 1px solid #f0f0f0;
-}
-.row:last-of-type { border-bottom: none; }
-.lbl { color: #888; font-size: 11px; font-weight: 500; }
-.val { font-weight: 600; color: #0a0a0a; font-size: 11px; text-align: right; max-width: 140px; }
-.badge {
-  display: inline-block; padding: 3px 10px;
-  border-radius: 6px; font-weight: 700; font-size: 11px;
-  letter-spacing: 0.02em;
-}
-.metric {
-  margin-top: 12px; padding-top: 12px;
-  border-top: 1.5px solid #0a0a0a;
-}
-.metric-label {
-  font-size: 9px; color: #aaa; text-transform: uppercase;
-  letter-spacing: 0.07em; margin-bottom: 4px; font-weight: 700;
-}
-.metric-value {
-  font-size: 24px; font-weight: 700; color: #0a0a0a;
-  letter-spacing: -0.02em; line-height: 1;
-}
-.metric-sub { font-size: 10px; color: #888; margin-top: 3px; font-weight: 500; }
-.hint { color: #aaa; font-size: 12px; line-height: 1.6; font-weight: 500; }
+/* Popover de glosario y modal */
+#pop{position:fixed;z-index:50;max-width:280px;padding:11px 13px;border:var(--line);border-radius:8px;background:var(--white);font-size:12px;line-height:1.5;display:none;box-shadow:0 6px 24px rgba(0,0,0,.08)}
+#pop b{display:block;margin-bottom:3px}
+#pop small{display:block;margin-top:5px;color:var(--g600)}
+#modal{position:fixed;inset:0;z-index:60;background:rgba(10,10,10,.35);display:none;align-items:center;justify-content:center;padding:16px}
+#modal .caja{width:min(640px,100%);max-height:88%;overflow:auto;background:var(--white);border:var(--line);border-radius:12px;padding:22px 24px}
+#modal h2{font-size:19px;letter-spacing:-.02em;margin-bottom:10px}
+#modal p,#modal li{font-size:13px;line-height:1.6;color:var(--g700)}
+#modal ul{padding-left:18px;margin:8px 0 12px;display:flex;flex-direction:column;gap:4px}
+#modal table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0 12px}
+#modal th,#modal td{text-align:left;padding:7px 8px;border-top:1px solid var(--g300);vertical-align:top}
+#modal th{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--g600);background:var(--g200)}
+#modal .cerrar{float:right;border:0;background:none;font-size:18px;color:var(--g600)}
 
-/* Botón calcular */
-.btn-calcular {
-  display: flex; align-items: center; justify-content: space-between;
-  width: 100%; padding: 10px 14px;
-  background: #0a0a0a; color: #fff;
-  border: none; border-radius: 8px;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.04em; text-transform: uppercase;
-  cursor: pointer; text-decoration: none;
-  margin-top: 12px; transition: opacity .15s;
-}
-.btn-calcular:hover { opacity: 0.85; }
-.btn-calcular-sub {
-  display: flex; align-items: center; justify-content: space-between;
-  width: 100%; padding: 8px 14px;
-  background: #fff; color: #0a0a0a;
-  border: 1.5px solid #0a0a0a; border-radius: 8px;
-  font-family: 'Space Grotesk', system-ui, sans-serif;
-  font-size: 11px; font-weight: 700;
-  letter-spacing: 0.04em; text-transform: uppercase;
-  cursor: pointer; text-decoration: none;
-  margin-top: 6px; transition: background .15s;
-}
-.btn-calcular-sub:hover { background: #f0f0f0; }
+/* Recorrido guiado */
+#tour{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);width:min(420px,calc(100% - 28px));padding:18px;border:var(--line);border-radius:14px;background:var(--white);z-index:30;display:none;flex-direction:column;gap:10px}
+#tour .pasos{display:flex;gap:4px}
+#tour .pasos i{width:18px;height:4px;border-radius:2px;background:var(--g400)}
+#tour .pasos i.on{background:var(--black)}
+#tour h3{font-size:19px;letter-spacing:-.02em}
+#tour p{font-size:14px;line-height:1.55;color:var(--g700)}
+#tour .acc{display:flex;justify-content:space-between;align-items:center;margin-top:4px}
+#tour .acc button{min-height:44px;padding:0 16px;border:var(--line);border-radius:8px;background:var(--white);font-size:13px;font-weight:600}
+#tour .acc .pri{background:var(--black);color:var(--white)}
+#tour .acc button:disabled{opacity:.35;cursor:not-allowed}
+#tour .acc .saltar{border:0;text-decoration:underline;color:var(--g600);padding:0 4px}
+.foco{position:relative;z-index:31!important;box-shadow:0 0 0 4px var(--azul)!important;border-radius:10px}
+#velo{position:absolute;inset:0;background:rgba(244,244,242,.55);z-index:25;display:none}
 
-/* ── Controles del mapa ──────────────────────────────────────── */
-.maplibregl-ctrl-group {
-  border: 1.5px solid #0a0a0a !important;
-  border-radius: 8px !important;
-  box-shadow: none !important;
-}
-.maplibregl-ctrl-group button {
-  background: #fff !important; color: #0a0a0a !important;
-}
-.maplibregl-ctrl-group button:hover { background: #f0f0f0 !important; }
-.maplibregl-ctrl-attrib { font-family: inherit; font-size: 9px; }
-.maplibregl-ctrl-attrib.maplibregl-compact { background: rgba(255,255,255,.85); }
-
-/* ── Zoom hint ───────────────────────────────────────────────── */
-#zoom-hint {
-  position: fixed; bottom: 28px; right: 14px;
-  background: #0a0a0a; color: #fff;
-  border-radius: 8px; padding: 7px 14px;
-  font-size: 11px; font-weight: 600; z-index: 1000;
-  display: none; letter-spacing: 0.03em;
+@media (max-width:768px){
+  :root{--panel:100%}
+  #app{grid-template-columns:1fr;grid-template-rows:var(--nav-h) 54% 1fr}
+  #vista{border-right:0}
+  #panel{grid-column:1;grid-row:3;border-top:var(--line);border-radius:14px 14px 0 0;margin-top:-10px;z-index:10}
+  #nav-links{display:none}
+  #nav{padding:0 12px}
+  #mostrar{top:8px;left:8px}
+  #mostrar .mini-t{display:none}
+  #btn-mostrar{display:inline-flex;align-items:center}
+  #mostrar [data-show]{display:none}
+  #mostrar.abierto [data-show]{display:inline-flex;align-items:center}
+  #aviso{top:52px;font-size:11px;padding:7px 10px}
+  #vistas{top:8px;right:8px}
+  .chip{min-height:30px;padding:0 9px;font-size:10px}
+  #stepper{bottom:18px;gap:6px;padding:5px 7px}
+  .big{width:44px;height:44px}
+  #niv{min-width:80px}
+  #llenar{height:44px;padding:0 10px}
+  #umbral{bottom:84px;left:8px;right:8px;width:auto}
+  #sello{display:none}
+  #tour{bottom:12px}
+  .tag{font-size:8.5px;padding:2px 5px}
 }
 </style>
 </head>
 <body>
+<div id="app">
+  <nav id="nav">
+    <a id="nav-logo" href="https://lab2.umbralgt.com">( U ) &nbsp; Lab 2 · Arquitectura</a>
+    <div id="nav-links">
+      <a class="nav-mod" href="https://mapa-pot.umbralgt.com">Mapa POT</a>
+      <a class="nav-mod" href="https://calculadora-pot.umbralgt.com">Calculadora POT</a>
+      <a class="nav-mod" href="https://entender-pot.umbralgt.com">Entender el POT</a>
+      <span class="nav-mod active">Mi terreno 3D</span>
+    </div>
+    <a class="nav-back" href="https://www.umbralgt.com">← umbralgt.com</a>
+  </nav>
 
-<!-- Nav -->
-<div id="header">
-  <a class="nav-logo" href="https://lab2.umbralgt.com">
-    ( U ) &nbsp; Lab 2 · Arquitectura
-  </a>
-  <div class="nav-links">
-    <a class="nav-link active" href="#">Mapa POT</a>
-    <a class="nav-link" href="https://calculadora-pot.umbralgt.com">Calculadora POT</a>
-    <a class="nav-link" href="https://entender-pot.umbralgt.com">Entender el POT</a>
-  </div>
-  <a class="nav-back" href="https://www.umbralgt.com" target="_blank" rel="noopener">
-    <span>←</span><span>umbralgt.com</span>
-  </a>
+  <main id="vista" aria-label="Modelo 3D del terreno">
+    <canvas id="c" aria-label="Modelo 3D: gira arrastrando, acerca con la rueda o con dos dedos"></canvas>
+    <svg id="guias"></svg>
+    <div id="tags"></div>
+    <div id="velo"></div>
+    <div class="grupo" id="mostrar" role="group" aria-label="Qué mostrar">
+      <span class="mini-t">Mostrar</span>
+      <button class="chip on" id="btn-mostrar" aria-expanded="false">Mostrar ▾</button>
+      <button class="chip on" data-show="etq" aria-pressed="true">Etiquetas</button>
+      <button class="chip on" data-show="fant" aria-pressed="true">Lo que permite la norma</button>
+      <button class="chip on" data-show="sot" aria-pressed="true">Sótanos</button>
+      <button class="chip on" data-show="vec" aria-pressed="true">Vecinos</button>
+      <button class="chip on" data-show="amb" aria-pressed="true">Ambiente</button>
+    </div>
+    <div class="grupo" id="vistas" role="group" aria-label="Vista">
+      <button class="chip sel" data-vista="axo">Axonométrica</button>
+      <button class="chip" data-vista="aerea">Aérea</button>
+      <button class="chip" data-vista="frontal">Frontal</button>
+      <button class="chip icon" id="btn-tour" aria-label="Recorrido guiado">?</button>
+    </div>
+    <div id="aviso" role="status"></div>
+    <div id="umbral" role="status" aria-live="polite"><button class="x" aria-label="Cerrar mensaje">✕</button><p></p></div>
+    <div id="stepper">
+      <button class="big" id="menos" aria-label="Quitar un nivel">−</button>
+      <div id="niv"><b>Nivel 0</b><span>0 m</span></div>
+      <button class="big pri" id="mas" aria-label="Agregar un nivel">+</button>
+      <button id="llenar">Llenar hasta el límite</button>
+    </div>
+    <div id="sello">Volumetría orientativa</div>
+    <div id="tour" role="dialog" aria-live="polite">
+      <div style="display:flex;justify-content:space-between;align-items:center"><span class="mini-t" id="tour-n"></span><span class="pasos" id="tour-pasos"></span></div>
+      <h3 id="tour-t"></h3><p id="tour-p"></p>
+      <div class="acc"><button class="saltar" id="tour-saltar">Saltar recorrido</button><span style="display:flex;gap:8px"><button id="tour-atras">Atrás</button><button class="pri" id="tour-sig">Siguiente</button></span></div>
+    </div>
+  </main>
+
+  <aside id="panel">
+    <div id="panel-top">
+      <div class="seg" role="group" aria-label="Nivel de detalle">
+        <button data-modo="simple" class="sel">Modo simple</button>
+        <button data-modo="tecnico">Modo técnico</button>
+      </div>
+      <div id="predio"></div>
+    </div>
+    <div id="scroll">
+      <div class="bloque" id="b-esc">
+        <span class="mini-t"><span class="g" data-g="escenario">Escenario</span></span>
+        <div class="seg" role="group" aria-label="Escenario">
+          <button data-esc="base" class="sel">Base</button>
+          <button data-esc="ampliado">Ampliado</button>
+          <button data-esc="maximo">Máximo*</button>
+        </div>
+      </div>
+      <div class="bloque">
+        <div class="fila-b" style="font-size:12px;color:var(--black)"><span style="font-weight:600">Metros permitidos usados</span><b id="pct">0%</b></div>
+        <div class="barra" id="barra"></div>
+        <div class="fila-b" id="barra-lbl"></div>
+      </div>
+      <div class="bloque" id="b-parq">
+        <span class="mini-t">Parqueos por apartamento</span>
+        <div class="seg" role="group" aria-label="Parqueos por apartamento">
+          <button data-pu="1" class="sel">1</button><button data-pu="2">2</button><button data-pu="3">3</button>
+        </div>
+      </div>
+      <div class="tec grid campos">
+        <div class="campo"><label for="h-piso">Altura piso a piso (m)</label><input id="h-piso" type="number" min="2.6" max="6" step="0.1" value="3"></div>
+        <div class="campo"><label for="huella"><span class="g" data-g="huella">Huella</span> por nivel (%)</label><input id="huella" type="number" min="30" max="100" step="5" value="90"></div>
+      </div>
+      <div class="cifras" id="cifras"></div>
+      <div class="tec" style="flex-direction:column;gap:6px">
+        <span class="mini-t">Niveles</span>
+        <div class="tabla-wrap"><table class="niveles" id="tabla"></table></div>
+      </div>
+    </div>
+    <div id="panel-pie">
+      <button class="cta" id="btn-cierre">Lo que este modelo no decide <span>→</span></button>
+      <div class="links"><button id="btn-supuestos">Supuestos</button><a id="link-calc" href="https://calculadora-pot.umbralgt.com">Ver en la calculadora →</a></div>
+    </div>
+  </aside>
 </div>
+<div id="pop" role="tooltip"></div>
+<div id="modal" role="dialog" aria-modal="true"><div class="caja"><button class="cerrar" aria-label="Cerrar">✕</button><div id="modal-c"></div></div></div>
 
-<div id="map"></div>
-
-<!-- Leyenda -->
-<div id="legend">
-  <h3>Zona G — POT</h3>
-  <div class="li" data-zona="G0"><div class="dot" style="background:#2d7a1f"></div>G0 · Sin edificar</div>
-  <div class="li" data-zona="G1"><div class="dot" style="background:#5aab2e"></div>G1 · Baja densidad</div>
-  <div class="li" data-zona="G2"><div class="dot" style="background:#c8d400"></div>G2 · Media-baja</div>
-  <div class="li" data-zona="G3"><div class="dot" style="background:#f5d800"></div>G3 · Media</div>
-  <div class="li" data-zona="G4"><div class="dot" style="background:#f59100"></div>G4 · Media-alta</div>
-  <div class="li" data-zona="G5"><div class="dot" style="background:#e02020"></div>G5 · Alta densidad</div>
-</div>
-
-<!-- Panel de predio -->
-<div id="panel">
-  <h3>Predio</h3>
-  <div class="hint">Hacé clic en un predio<br>para ver su ficha.</div>
-</div>
-
-<!-- Zoom hint -->
-<div id="zoom-hint">Acercate para ver predios individuales</div>
-
-<script>
-// V2: el archivo vive en el mismo repositorio de GitHub (ya no depende de Supabase, que pausa proyectos inactivos).
-// Incluye ancho, largo y regularidad de cada predio, calculados desde su forma completa.
-const PMTILES_URL = new URL('predios.pmtiles', window.location.href).href;
-
-// URL de la calculadora — ajustar cuando esté en producción
-const CALC_URL = 'https://calculadora-pot.umbralgt.com';
-
-const COLORS = {
-  G0:'#2d7a1f', G1:'#5aab2e', G2:'#c8d400',
-  G3:'#f5d800', G4:'#f59100', G5:'#e02020'
-};
-const TEXT_COLORS = {
-  G0:'#fff', G1:'#fff', G2:'#1a1a00',
-  G3:'#1a1a00', G4:'#fff', G5:'#fff'
-};
-const DESCS = {
-  G0:'Sin edificar / restricción',
-  G1:'Baja densidad',
-  G2:'Media-baja densidad',
-  G3:'Media densidad',
-  G4:'Media-alta densidad',
-  G5:'Alta densidad'
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegmentsGeometry.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineMaterial.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegments2.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/clipper-lib@6.4.2/clipper.js"></script>
+<script>/* pot-motor.js · UMBRAL Lab 2 · motor compartido Calculadora POT + Modelo 3D
+   Reglas: Ficha normativa POT (COM-030-08 con reformas; COM-48-2024 por verificar). */
+(function(root){
+// V14: parámetros verificados contra el reglamento POT (arts. 42-47, 47 Bis). Ver Ficha normativa POT.
+const POT = {
+  G1:{ie:1.2, ie_a:1.8,  ie_max:null, alt:16,  alt_a:24,  alt_max:null, perm:.70,bs:8, sepBS:3,fDCT:20,aDCT:1000,nom:'Rural'},
+  G2:{ie:1.8, ie_a:2.7,  ie_max:null, alt:16,  alt_a:24,  alt_max:null, perm:.40,bs:8, sepBS:3,fDCT:8, aDCT:120, nom:'Semiurbana'},
+  G3:{ie:2.7, ie_a:4.0,  ie_max:null, alt:16,  alt_a:24,  alt_max:null, perm:.10,bs:12,sepBS:3,fDCT:3, aDCT:60,  nom:'Urbana'},
+  G4:{ie:4.0, ie_a:6.0,  ie_max:9.0,  alt:32,  alt_a:48,  alt_max:96,   perm:.00,bs:16,sepBS:4,fDCT:15,aDCT:450, nom:'Central'}, // Confirmado: POT COM-030-08 art. 46 (texto con reformas 2011-2013)
+  G5:{ie:6.0, ie_a:9.0,  ie_max:11.0, alt:64,  alt_a:96,  alt_max:128,  perm:.00,bs:16,sepBS:5,fDCT:21,aDCT:600, nom:'Núcleo'} // ie/alt base y ampliado confirmados (art. 47). ie_max 11.0 / alt_max 128 según COM-48-2024 — PENDIENTE verificar texto oficial
 };
 
-// IE máximo por zona (referencia POT)
-const IE_REF = { G0:0, G1:1.2, G2:1.8, G3:2.7, G4:4, G5:6 }; // IE base POT (igual que la calculadora)
+const LAB1_VENTA = {
+  z01:1771,z02:1935,z04:2601,z05:2705,z06:1394,z07:1695,z09:2040,
+  z10:2778,z11:2292,z12:2055,z13:2473,z14:2533,z15:2840,z16:2079,z17:1630,z18:1055,
+  z21:1191
+};
 
-// Protocolo PMTiles
-const protocol = new pmtiles.Protocol();
-maplibregl.addProtocol('pmtiles', protocol.tile);
+const IVA_TASA = 0.12; // IVA Guatemala (SAT) — primera venta de inmueble nuevo
 
-const map = new maplibregl.Map({
-  container: 'map',
-  // Mapa de fondo: OpenFreeMap Positron — gratuito, sin clave y sin límites.
-  // (CARTO empezó a exigir clave en 2026 y mostraba "API KEY REQUIRED".)
-  style: 'https://tiles.openfreemap.org/styles/positron',
-  attributionControl: false,
-  center: [-90.507, 14.621],
-  zoom: 13,
-  maxZoom: 18,
-  minZoom: 10
-});
 
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+// Supuestos del desarrollador (prefijo 'p' = Pro, 't' = Tasador)
 
-// Filtros activos
-const activeZonas = new Set(['G0','G1','G2','G3','G4','G5']);
-
-function buildFilter() {
-  const active = [...activeZonas];
-  if (active.length === 6) return ['has', 'zona_g'];
-  if (active.length === 0) return ['==', 'zona_g', ''];
-  return ['in', ['get', 'zona_g'], ['literal', active]];
+// Parámetros según escenario
+function paramsEscenario(zonaG, esc){
+  const g=POT[zonaG];
+  const esMax = esc==='max' && (zonaG==='G4'||zonaG==='G5') && !!g.ie_max;
+  const esMedio = esc==='max' && !esMax;
+  return {g, esMax, esMedio,
+    ie:  esMax?g.ie_max : esMedio?g.ie_a : g.ie,
+    alt: esMax?g.alt_max: esMedio?g.alt_a: g.alt};
 }
 
-// Construir URL de la calculadora con parámetros del predio
-// Dirección de la herramienta "Mi terreno 3D" (cambiala si usás otro subdominio)
-const URL_3D = 'https://terreno3d.umbralgt.com';
-function build3DURL(p, g, feat) {
-  const geom = feat.geometry;
-  const ring = geom.type === 'Polygon' ? geom.coordinates[0] : geom.coordinates[0][0];
-  const cx = ring.reduce((s, q) => s + q[0], 0) / ring.length;
-  const cy = ring.reduce((s, q) => s + q[1], 0) / ring.length;
-  const params = new URLSearchParams();
-  if (p.ncm) params.set('ncm', p.ncm);
-  params.set('c', cx.toFixed(6) + ',' + cy.toFixed(6));
-  if (g) params.set('zona', g);
-  if (p.area_m2) params.set('area', Math.round(p.area_m2));
-  if (p.zona) params.set('zona_postal', p.zona);
-  if (p.ancho && p.largo) { params.set('ancho', p.ancho); params.set('largo', p.largo); }
-  return URL_3D + '?' + params.toString();
+// Estacionamientos: mínimo normativo vs. diseño elegido por el usuario.
+// Cada componente nunca queda por debajo de la norma.
+// Visitas según Anexo I del COM-03-2009: por m² residenciales totales, no por unidad.
+// (Límites intermedios 1,500/3,000/4,500 m²: verificar con el texto oficial.)
+function visitasNorma(m2R){
+  if(m2R<500) return 0;
+  if(m2R<=1500) return 3;
+  if(m2R<=3000) return 4;
+  if(m2R<=4500) return 6;
+  return Math.ceil(m2R/800);
 }
 
-function buildCalcURL(p, g) {
-  const params = new URLSearchParams();
-  if (g)         params.set('zona', g);
-  if (p.area_m2) params.set('area', Math.round(p.area_m2));
-  if (p.ie_max)  params.set('ie', p.ie_max);
-  if (p.alt_perm) params.set('alt', p.alt_perm);
-  if (p.zona)    params.set('zona_postal', p.zona);
-  if (p.ancho && p.largo) { params.set('ancho', p.ancho); params.set('largo', p.largo); }
-  return `${CALC_URL}?${params.toString()}`;
+function estacionamientos(o){
+  const esZonaAlta = o.zonaG==='G3'||o.zonaG==='G4'||o.zonaG==='G5';
+  // COM-03-2009 (ratios trabajados en versiones anteriores) · VERIFICAR vigencia con COM-29-2025
+  const normRes = esZonaAlta ? Math.ceil(o.m2R/300) : Math.ceil(o.m2R/100);
+  const normVis = visitasNorma(o.m2R);
+  const am = o.am>0 ? Math.ceil(o.am/75) : 0; // COM-29-2025: 1 c/75 m² áreas sociales
+  const disRes = Math.ceil(o.nu*o.plazasU);
+  const disVis = (o.visitas!=null && o.visitas>=0) ? o.visitas : normVis;
+  const res = Math.max(normRes, disRes);
+  const vis = Math.max(normVis, disVis);
+  return {normRes, normVis, am, norma:normRes+normVis+am,
+          disRes, disVis, res, vis, total:res+vis+am};
 }
 
-map.on('load', () => {
-  // Los predios se dibujan debajo de las etiquetas (nombres de calles y colonias)
-  const primeraEtiqueta = (map.getStyle().layers.find(l => l.type === 'symbol') || {}).id;
+// Sótano por plazas × m²/plaza. Nunca ocupa el área permeable mínima.
+function calcSotanoV10(o){
+  const permMin = o.area*o.perm;
+  const areaNivelMax = o.area*(1-o.perm);
+  const areaLibre = o.permiteSup ? Math.max(0, o.area - o.huella - permMin) : 0;
+  const sup = Math.floor(areaLibre/o.m2Plaza);
+  const avisos=[];
+  if(o.ancho>0 && o.largo>0 && Math.min(o.ancho,o.largo)<15) avisos.push('angosto');
 
-  map.addSource('predios', {
-    type: 'vector',
-    url: 'pmtiles://' + PMTILES_URL
+  if(o.nivDecl>0){ // sótano declarado por el usuario
+    const aDecl = o.areaDecl>0 ? o.areaDecl : areaNivelMax;
+    const excedePerm = aDecl > areaNivelMax + 0.5;
+    const aN = Math.min(aDecl, areaNivelMax);
+    const plazasSot = o.nivDecl*Math.floor(aN/o.m2Plaza);
+    const plazasSup = Math.min(sup, Math.max(0,o.plazas-plazasSot));
+    return {modo:'declarado', niveles:o.nivDecl, areaNivel:aN, m2Sot:aN*o.nivDecl,
+            plazasSot, plazasSup, capacidad:plazasSot+sup,
+            suficiente:plazasSot+sup>=o.plazas, excedePerm, avisos};
+  }
+  if(sup>=o.plazas){
+    return {modo:'superficie', niveles:0, m2Sot:0, plazasSot:0, plazasSup:o.plazas,
+            capacidad:sup, suficiente:true, excedePerm:false, avisos};
+  }
+  const plazasSot = o.plazas - sup;
+  const porNivel = Math.floor(areaNivelMax/o.m2Plaza);
+  if(porNivel<1){
+    return {modo:'inviable', niveles:0, m2Sot:0, plazasSot:0, plazasSup:sup,
+            capacidad:sup, suficiente:false, excedePerm:false, avisos};
+  }
+  const niveles = Math.ceil(plazasSot/porNivel);
+  if(niveles>4) avisos.push('muchos_niveles');
+  return {modo:'auto', niveles, areaNivel:areaNivelMax, porNivel,
+          m2Sot:plazasSot*o.m2Plaza, plazasSot, plazasSup:sup,
+          capacidad:sup+niveles*porNivel, suficiente:true, excedePerm:false, avisos};
+}
+
+// Costos completos sin terreno (incluye costos del desarrollador)
+function costosProyecto(o){
+  const obraSup = o.m2T*o.cm2;
+  const obraSot = o.sot.m2Sot*o.cSot;
+  const obra = obraSup+obraSot;
+  const cDi = obra*o.di/100, cAd = obra*o.ad/100, cIns = obra*o.ins/100;
+  const cImp = obra*o.dev.imp/100;
+  const cUrb = o.area*18;
+  const licE = Math.round(o.m2T*2.5*({G1:.8,G2:.9,G3:1,G4:1.2,G5:1.4}[o.zonaG]||1));
+  const m2Inc = o.esMax ? Math.max(0, o.m2T - o.area*POT[o.zonaG].ie) : 0;
+  const cCau = Math.round(m2Inc*o.cm2*0.05);
+  const cCom = o.ventas*o.dev.com/100;
+  const baseFin = obra+cDi+cAd+cIns+cImp+cUrb+licE+cCau;
+  // Saldo promedio ~50% durante el plazo (desembolso progresivo). El terreno se asume con capital propio.
+  const cFin = baseFin*(o.dev.finPct/100)*(o.dev.finTasa/100)*(o.dev.finMeses/12)*0.5;
+  let ivaDeb=0, ivaCred=0, cIva=0;
+  if(o.dev.iva==='si' && o.ventas>0){
+    ivaDeb  = o.ventas*IVA_TASA/(1+IVA_TASA);                    // IVA incluido en el precio de venta
+    ivaCred = (obra+cDi+cAd+cIns+cImp+cCom)*IVA_TASA/(1+IVA_TASA); // crédito fiscal de costos facturados
+    cIva = Math.max(0, ivaDeb-ivaCred);
+  }
+  const total = baseFin+cCom+cFin+cIva;
+  return {obraSup, obraSot, obra, cDi, cAd, cIns, cImp, cUrb, licE, cCau, m2Inc,
+          cCom, cFin, ivaDeb, ivaCred, cIva, total};
+}
+
+// Programa automático: respeta IE del escenario Y la altura
+function programaAuto(zonaG, area, tipoU, esc, altPT, ci){
+  const p = paramsEscenario(zonaG, esc);
+  const nMax = Math.max(1, Math.floor(p.alt/altPT));
+  const huellaMax = area*(1-p.g.perm)*0.90;
+  const m2TporIE = area*p.ie;
+  const m2TporAlt = huellaMax*nMax;
+  const limitaAltura = m2TporAlt < m2TporIE;
+  const m2Tmax = Math.min(m2TporIE, m2TporAlt);
+  const unidades = Math.floor(m2Tmax/(1+ci)/tipoU); // 0 = no cabe ni una unidad
+  const m2R = unidades*tipoU, m2T = m2R*(1+ci);
+  const niveles = Math.ceil(m2T/Math.max(huellaMax,1));
+  return {p, unidades, m2R, m2T, niveles, nMax, huellaMax, limitaAltura};
+}
+
+// Proyecto completo (lo usan Pro y Tasador)
+function evaluarProyecto(o){
+  // o: zonaG, esc, area, ancho, largo, nu, au, ci, cm2, di, ad, ins, altPT, am,
+  //    plazasU, visitas, m2Plaza, cSot, nivDecl, areaDecl, pv, dev
+  const P = paramsEscenario(o.zonaG, o.esc);
+  const g = P.g;
+  const m2R = o.nu*o.au;
+  const m2T = m2R*(1+o.ci/100);
+  const m2E = o.area*P.ie;
+  const nMax = Math.max(1, Math.floor(P.alt/o.altPT));
+  const huellaMax = o.area*(1-g.perm);
+  const huella = m2T/nMax;
+  const est = estacionamientos({zonaG:o.zonaG, nu:o.nu, m2R, am:o.am, plazasU:o.plazasU, visitas:o.visitas});
+  const sot = calcSotanoV10({area:o.area, perm:g.perm, huella:Math.min(huella,huellaMax),
+    plazas:est.total, m2Plaza:o.m2Plaza, ancho:o.ancho, largo:o.largo,
+    nivDecl:o.nivDecl||0, areaDecl:o.areaDecl||0,
+    permiteSup: o.zonaG==='G1'||o.zonaG==='G2'||o.zonaG==='G3'});
+  const ventas = o.pv ? m2R*o.pv : 0;
+  const C = costosProyecto({zonaG:o.zonaG, area:o.area, m2T, cm2:o.cm2, di:o.di, ad:o.ad, ins:o.ins,
+    sot, cSot:o.cSot, esMax:P.esMax, dev:o.dev, ventas});
+  return {P, g, m2R, m2T, m2E, nMax, huella, huellaMax, est, sot, ventas, C,
+          cumIE: m2T <= m2E+0.5,
+          cumAlt: huella <= huellaMax+0.5,
+          nivNec: Math.ceil(m2T/Math.max(huellaMax,1))};
+}
+
+// Valor residual: el desarrollador exige margen sobre INVERSIÓN TOTAL (terreno + costos)
+// Ventas = (Terreno + Costos) × (1 + m)  →  Terreno = Ventas/(1+m) − Costos
+function valorResidual(ventas, costosSinTerreno, margenPct){
+  return Math.max(0, ventas/(1+margenPct/100) - costosSinTerreno);
+}
+// ==================== GEOMETRÍA (requiere ClipperLib) ====================
+// Coordenadas en metros locales. Clipper trabaja con enteros: escala 100 = centímetros.
+const ESC_CL = 100;
+function _CL(){ return (typeof ClipperLib!=='undefined') ? ClipperLib : require('clipper-lib'); }
+function aClipper(paths){ return paths.map(r=>r.map(([x,y])=>({X:Math.round(x*ESC_CL),Y:Math.round(y*ESC_CL)}))); }
+function deClipper(paths){ return paths.map(r=>r.map(p=>[p.X/ESC_CL,p.Y/ESC_CL])); }
+function areaPaths(paths){ const CL=_CL(); return aClipper(paths).reduce((s,r)=>s+CL.Clipper.Area(r),0)/(ESC_CL*ESC_CL); }
+// Área con signo por anillo → usamos el valor absoluto del total de anillos exteriores menos huecos
+function areaAbs(paths){ return Math.abs(areaPaths(paths)); }
+
+// Reduce una forma hacia adentro d metros (retiro uniforme desde todos los bordes)
+function insetPaths(paths, d){
+  if(d<=0) return paths;
+  const CL=_CL(); const co=new CL.ClipperOffset(2, 0.25*ESC_CL);
+  co.AddPaths(aClipper(paths), CL.JoinType.jtMiter, CL.EndType.etClosedPolygon);
+  const sol=new CL.Paths(); co.Execute(sol, -d*ESC_CL);
+  return deClipper(sol);
+}
+function interseccion(a, b){
+  const CL=_CL(); const c=new CL.Clipper();
+  c.AddPaths(aClipper(a), CL.PolyType.ptSubject, true); c.AddPaths(aClipper(b), CL.PolyType.ptClip, true);
+  const sol=new CL.Paths(); c.Execute(CL.ClipType.ctIntersection, sol, CL.PolyFillType.pftNonZero, CL.PolyFillType.pftNonZero);
+  return deClipper(sol);
+}
+// Retira la forma hacia adentro hasta que su área sea <= objetivo (búsqueda binaria del retiro)
+function insetHastaArea(paths, objetivo){
+  if(areaAbs(paths) <= objetivo) return {paths, d:0};
+  let lo=0, hi=200;
+  for(let i=0;i<40;i++){ const m=(lo+hi)/2; (areaAbs(insetPaths(paths,m))>objetivo) ? lo=m : hi=m; }
+  return {paths: insetPaths(paths,hi), d:hi};
+}
+// Convierte un anillo lon/lat a metros locales alrededor de su centro
+function lonLatAMetros(ring){
+  const n=ring.length, cx=ring.reduce((s,p)=>s+p[0],0)/n, cy=ring.reduce((s,p)=>s+p[1],0)/n;
+  const kx=111320*Math.cos(cy*Math.PI/180), ky=110574;
+  return {ring: ring.map(([x,y])=>[(x-cx)*kx,(y-cy)*ky]), centro:[cx,cy]};
+}
+
+// ==================== VOLUMETRÍA PISO POR PISO ====================
+// Escenarios: 'base' | 'ampliado' | 'maximo' (maximo solo G4/G5, valores COM-48-2024 por verificar)
+function limitesEscenario(zonaG, esc){
+  const g=POT[zonaG];
+  if(esc==='maximo' && g.ie_max) return {ie:g.ie_max, alt:g.alt_max, porVerificar:true};
+  if(esc==='ampliado' || esc==='maximo') return {ie:g.ie_a, alt:g.alt_a};
+  return {ie:g.ie, alt:g.alt};
+}
+function categoriaNivel(g, acum, A, z1){
+  if(acum <= g.ie*A + 0.5 && z1 <= g.alt + 1e-6) return 'base';
+  if(acum <= g.ie_a*A + 0.5 && z1 <= g.alt_a + 1e-6) return 'ampliado';
+  return 'maximo';
+}
+// op: {paths, zonaG, esc, hPiso=3, huellaPct=1}
+function volumetria(op){
+  const g=POT[op.zonaG], h=op.hPiso||3, pct=op.huellaPct==null?0.9:op.huellaPct; // Huella del edificio: 90% por defecto (el sótano siempre usa la huella máxima)
+  const A=areaAbs(op.paths), lim=limitesEscenario(op.zonaG, op.esc||'base');
+  // Huella del bloque inferior: la forma del predio menos el área permeable (convención: retiro uniforme)
+  let inf = g.perm>0 ? insetHastaArea(op.paths, A*(1-g.perm)).paths : op.paths;
+  if(pct<1) inf = insetHastaArea(inf, areaAbs(inf)*pct).paths;
+  // Huella del bloque superior: retirada sepBS de TODOS los linderos (incluida la calle) y dentro de la inferior
+  const sup = interseccion(insetPaths(op.paths, g.sepBS), inf);
+  const aInf=areaAbs(inf), aSup=areaAbs(sup), m2Lim=lim.ie*A;
+  const niveles=[]; let acum=0, motivo=null, i=0;
+  while(i<200){
+    i++; const z0=(i-1)*h, z1=i*h;
+    if(z1 > lim.alt + 1e-6){ motivo='altura'; break; }
+    const bloque = z1 <= g.bs + 1e-6 ? 'inferior' : 'superior';
+    let area = bloque==='inferior' ? aInf : aSup;
+    if(area < 1){ motivo='retiro'; break; }
+    const resta = m2Lim - acum;
+    if(resta <= 1){ motivo='indice'; break; }
+    // Convención: un último nivel menor a 1/4 de planta no se construye (queda como remanente del índice)
+    if(area > resta && resta < area*0.25){ motivo='indice'; break; }
+    let parcial=false; if(area > resta){ area=resta; parcial=true; }
+    acum += area;
+    niveles.push({n:i, z0, z1, bloque, area, acum, parcial, pisosNorma: h>4?Math.ceil(h/4):1, cat:categoriaNivel(g, acum, A, z1)});
+    if(parcial){ motivo='indice'; break; }
+  }
+  const alt = niveles.length ? niveles[niveles.length-1].z1 : 0;
+  return {A, lim, aInf, aSup, inf, sup, niveles, m2:acum, alt, pctIE: acum/(g.ie*A), motivo,
+          m2Base:g.ie*A, m2Amp:g.ie_a*A, m2Max:g.ie_max?g.ie_max*A:null};
+}
+
+// Programa, parqueos, sótanos y valor sobre una volumetría (mismo motor que la calculadora)
+const DEV_ESTANDAR = {com:4, imp:5, finTasa:9, finMeses:24, finPct:70, iva:'si'};
+function evaluarVolumetria(v, op){
+  const au=op.au||80, g=POT[op.zonaG], pv=op.pv||null, m2Plaza=op.m2Plaza||30;
+  const nu=Math.floor(v.m2/1.2/au), m2R=nu*au;
+  const est=estacionamientos({zonaG:op.zonaG, nu, m2R, am:0, plazasU:op.plazasU||1, visitas:null});
+  const sot=calcSotanoV10({area:v.A, perm:g.perm, huella:v.aInf, plazas:est.total, m2Plaza,
+    ancho:0, largo:0, nivDecl:0, areaDecl:0, permiteSup: op.zonaG==='G1'||op.zonaG==='G2'||op.zonaG==='G3'});
+  const ventas = pv ? m2R*pv : 0;
+  const C = costosProyecto({zonaG:op.zonaG, area:v.A, m2T:v.m2, cm2:op.cm2||580, di:5.5, ad:5.5, ins:13,
+    sot, cSot:op.cSot||700, esMax: op.esc==='ampliado'||op.esc==='maximo', dev:op.dev||DEV_ESTANDAR, ventas}); // caución 5% sobre lo obtenido por incentivos (COM-48-2024)
+  const valor = pv ? valorResidual(ventas, C.total, op.margen||25) : null;
+  // Procedimiento según el nivel más exigente alcanzado
+  const proc = v.niveles.some(n=>n.cat!=='base') ? 'DCT con incentivos (o Junta + vecinos)' : 'DCT, vía directa';
+  return {nu, m2R, est, sot, ventas, C, valor, proc};
+}
+
+const API={POT, LAB1_VENTA, paramsEscenario, visitasNorma, estacionamientos, calcSotanoV10, costosProyecto,
+  programaAuto, evaluarProyecto, valorResidual, areaAbs, insetPaths, interseccion, insetHastaArea, lonLatAMetros,
+  limitesEscenario, volumetria, evaluarVolumetria};
+if(typeof module!=='undefined' && module.exports) module.exports=API; else root.POTMotor=API;
+})(typeof window!=='undefined'?window:globalThis);
+</script>
+<script>const DEMO = {"predio": [[-19.65, 51.6], [47.57, 39.66], [47.57, -27.9], [12.88, -27.02], [-5.0, -27.35], [-21.48, -27.02], [-20.84, -17.18], [-21.38, -16.4], [-19.65, 51.6]], "vecinos": [{"g": "G5", "r": [[-124.36, 46.74], [-105.18, 45.08], [-111.11, 2.4], [-147.95, 6.82], [-143.32, 39.33], [-125.65, 36.34], [-124.36, 46.74]]}, {"g": "G5", "r": [[-105.18, 45.08], [-83.32, 43.31], [-82.02, 43.31], [-83.32, 34.46], [-88.38, -0.48], [-111.11, 2.4], [-105.18, 45.08]]}, {"g": "G4", "r": [[-136.75, -4.13], [-128.13, -5.12], [-134.16, -49.13], [-142.89, -48.14], [-136.75, -4.13]]}, {"g": "G4", "r": [[-140.52, -48.47], [-120.91, -50.9], [-123.61, -74.23], [-126.73, -74.01], [-129.53, -93.8], [-144.07, -92.03], [-140.52, -48.47]]}, {"g": "G5", "r": [[-128.13, -5.12], [-89.56, -9.44], [-96.03, -54.0], [-134.16, -49.13], [-128.13, -5.12]]}, {"g": "G4", "r": [[-120.91, -50.9], [-96.03, -54.0], [-97.75, -65.61], [-122.2, -62.51], [-120.91, -50.9]]}, {"g": "G4", "r": [[-122.2, -62.51], [-97.75, -65.61], [-99.69, -77.11], [-123.61, -74.23], [-122.2, -62.51]]}, {"g": "G5", "r": [[-126.73, -74.01], [-116.71, -75.12], [-118.0, -83.3], [-119.51, -94.91], [-129.53, -93.8], [-126.73, -74.01]]}, {"g": "G5", "r": [[-116.71, -75.12], [-99.69, -77.11], [-102.6, -95.46], [-103.57, -96.68], [-119.51, -94.91], [-118.0, -83.3], [-116.71, -75.12]]}, {"g": "G5", "r": [[-89.67, -76.89], [-83.32, -77.88], [-75.67, -78.99], [-78.58, -101.1], [-83.32, -100.55], [-91.4, -99.33], [-92.04, -98.78], [-92.58, -97.67], [-89.67, -76.89]]}, {"g": "G5", "r": [[-121.67, 68.85], [-83.32, 62.22], [-71.79, 60.23], [-71.79, 42.42], [-83.32, 43.31], [-105.18, 45.08], [-124.36, 46.74], [-121.67, 68.85]]}, {"g": "G5", "r": [[-82.02, 43.31], [-71.79, 42.42], [-71.79, 12.02], [-83.32, 13.12], [-86.33, 13.56], [-83.32, 34.46], [-82.02, 43.31]]}, {"g": "G5", "r": [[-86.33, 13.56], [-83.32, 13.12], [-73.95, 12.13], [-71.79, 12.02], [-71.79, -2.47], [-83.32, -1.03], [-88.38, -0.48], [-86.33, 13.56]]}, {"g": "G5", "r": [[-78.47, -11.87], [-71.79, -12.75], [-71.79, -40.84], [-84.5, -39.29], [-83.32, -30.89], [-81.05, -13.75], [-78.47, -11.87]]}, {"g": "G5", "r": [[-84.5, -39.29], [-71.79, -40.84], [-71.79, -58.64], [-83.32, -56.76], [-83.75, -56.76], [-85.9, -56.43], [-86.76, -56.21], [-84.5, -39.29]]}, {"g": "G5", "r": [[-75.67, -78.99], [-71.79, -79.54], [-71.79, -101.99], [-78.58, -101.1], [-75.67, -78.99]]}, {"g": "G5", "r": [[-92.9, -110.17], [-83.32, -111.27], [-71.79, -112.71], [-71.79, -135.71], [-83.32, -134.38], [-97.97, -132.73], [-94.95, -111.38], [-92.9, -110.17]]}, {"g": "G5", "r": [[-60.91, 97.49], [-37.86, 93.07], [-38.83, 71.28], [-39.47, 70.4], [-40.44, 69.96], [-62.1, 73.94], [-60.91, 97.49]]}, {"g": "G4", "r": [[-19.44, 118.06], [4.91, 116.29], [4.48, 108.44], [-19.44, 110.32], [-19.44, 118.06]]}, {"g": "G4", "r": [[-19.33, 131.66], [52.41, 123.92], [50.26, 119.94], [-19.33, 126.46], [-19.33, 131.66]]}, {"g": "G4", "r": [[-19.44, 151.45], [78.7, 144.04], [71.26, 132.76], [65.12, 123.14], [52.41, 123.92], [-19.33, 131.66], [-19.44, 151.45]]}, {"g": "G4", "r": [[-19.33, 126.46], [50.26, 119.94], [48.21, 115.84], [-19.44, 120.49], [-19.33, 126.46]]}, {"g": "G4", "r": [[-19.44, 120.49], [48.21, 115.84], [42.83, 105.34], [4.48, 108.44], [4.91, 116.29], [-19.44, 118.06], [-19.44, 120.49]]}, {"g": "G4", "r": [[-19.76, 99.37], [37.33, 94.95], [31.62, 84.11], [-20.08, 86.21], [-19.76, 99.37]]}, {"g": "G4", "r": [[-19.44, 110.32], [42.83, 105.34], [37.33, 94.95], [-19.76, 99.37], [-19.44, 110.32]]}, {"g": "G4", "r": [[52.41, 123.92], [68.03, 123.03], [33.99, 70.51], [3.94, 75.15], [3.72, 76.15], [-20.41, 76.59], [-20.08, 86.21], [31.62, 84.11], [52.41, 123.92]]}, {"g": "G4", "r": [[56.83, 105.78], [69.97, 98.93], [69.22, 86.43], [68.79, 48.17], [32.48, 54.25], [33.99, 70.51], [56.83, 105.78]]}, {"g": "G3", "r": [[71.26, 132.76], [91.73, 128.01], [91.62, 95.61], [69.97, 98.93], [56.83, 105.78], [68.03, 123.03], [65.12, 123.14], [71.26, 132.76]]}, {"g": "G3", "r": [[69.97, 98.93], [91.62, 95.61], [91.41, 82.89], [69.22, 86.43], [69.97, 98.93]]}, {"g": "G5", "r": [[-54.56, -14.74], [-36.67, -16.84], [-37.21, -63.84], [-41.2, -63.4], [-52.4, -61.63], [-51.54, -54.77], [-50.25, -54.77], [-49.82, -43.6], [-56.28, -42.72], [-54.56, -14.74]]}, {"g": "G4", "r": [[-12.01, 76.37], [-1.77, 76.26], [-2.31, 60.23], [-18.36, 63.1], [-19.76, 64.65], [-16.42, 64.65], [-16.31, 68.41], [-12.11, 68.41], [-12.01, 76.37]]}, {"g": "G4", "r": [[-1.77, 76.26], [3.72, 76.15], [3.94, 75.15], [16.76, 73.05], [14.49, 57.35], [-2.31, 60.23], [-1.77, 76.26]]}, {"g": "G4", "r": [[16.76, 73.05], [33.99, 70.51], [32.48, 54.25], [14.49, 57.35], [16.76, 73.05]]}, {"g": "G4", "r": [[47.57, 39.66], [69.33, 35.9], [69.33, -4.24], [47.57, -0.48], [47.57, 39.66]]}, {"g": "G4", "r": [[12.88, -27.02], [12.12, -69.92], [-18.58, -69.81], [-18.58, -68.81], [-20.95, -68.7], [-21.48, -27.02], [-5.0, -27.35], [12.88, -27.02]]}, {"g": "G3", "r": [[12.88, -27.02], [69.65, -28.45], [91.19, -28.34], [94.53, -30.22], [93.89, -72.02], [89.47, -72.02], [89.47, -70.58], [12.12, -69.92], [12.88, -27.02]]}, {"g": "G5", "r": [[-67.27, -59.3], [-41.2, -63.4], [-37.21, -63.84], [-37.64, -84.74], [-38.61, -104.86], [-39.91, -106.41], [-65.0, -102.98], [-61.77, -81.2], [-70.07, -79.87], [-67.27, -59.3]]}, {"g": "G4", "r": [[-18.58, -69.81], [89.47, -70.58], [89.47, -72.02], [112.84, -72.02], [112.74, -105.97], [97.12, -108.29], [69.54, -110.39], [30.55, -113.15], [-13.73, -115.37], [-13.62, -116.03], [-20.08, -115.7], [-18.58, -69.81]]}, {"g": "G3", "r": [[69.22, 86.43], [91.41, 82.89], [91.41, 48.28], [91.19, 47.51], [89.9, 46.4], [87.53, 45.52], [84.19, 45.41], [68.79, 48.17], [69.22, 86.43]]}, {"g": "G3", "r": [[69.33, 35.9], [88.39, 32.25], [90.01, 30.37], [90.44, 27.94], [90.87, -6.67], [86.67, -6.78], [78.7, -5.68], [69.33, -4.79], [69.33, 35.9]]}, {"g": "G3", "r": [[125.23, 26.06], [129.65, 25.28], [130.19, 12.24], [130.51, 6.82], [128.03, 6.49], [128.25, -4.13], [127.17, -4.13], [127.28, -15.3], [124.59, -15.3], [125.23, 26.06]]}, {"g": "G3", "r": [[69.33, -4.79], [78.7, -5.68], [86.67, -6.78], [90.87, -6.67], [90.98, -20.16], [69.11, -18.61], [69.33, -4.79]]}, {"g": "G3", "r": [[61.68, -18.5], [70.83, -18.72], [90.98, -20.16], [91.19, -28.34], [69.65, -28.45], [61.46, -28.23], [61.68, -18.5]]}, {"g": "G3", "r": [[99.27, -11.09], [106.92, -12.53], [106.92, -11.87], [124.59, -15.3], [153.89, -14.85], [153.89, -29.89], [99.16, -28.79], [99.27, -11.09]]}, {"g": "G3", "r": [[129.65, 25.28], [145.38, 22.63], [153.89, 13.23], [153.89, 7.26], [130.51, 6.82], [129.65, 25.28]]}, {"g": "G3", "r": [[153.89, 7.26], [153.89, -3.58], [128.25, -4.13], [128.03, 6.49], [153.89, 7.26]]}, {"g": "G3", "r": [[153.89, -3.58], [153.89, -14.85], [127.28, -15.3], [127.17, -4.13], [153.89, -3.58]]}]};</script>
+<script>(function(){
+'use strict';
+const M = window.POTMotor;
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const fmt = n => Math.round(n).toLocaleString('es-GT');
+const usdM = v => 'US$' + (v/1e6).toFixed(1) + 'M';
+
+// ─── Colores UMBRAL ───
+const ZC = {G0:0x2d6e1e,G1:0x5abf28,G2:0xa8d42a,G3:0xf5c000,G4:0xf07820,G5:0xd42018};
+const AZUL = 0x2f5bd3;
+const tint = (hex,t) => new THREE.Color(hex).lerp(new THREE.Color(0xffffff), 1-t);
+
+// ─── Estado ───
+const S = window.__S3D = {
+  zonaG:'G4', zp:null, A:0, paths:null, vecinos:[], ancho:null, largo:null, ncm:null, demo:false, fuente:'',
+  esc:'base', n:0, pu:1, modo:'simple', hPiso:3, huella:0.9,
+  show:{etq:true, fant:true, sot:true, vec:true, amb:true}, vista:'axo',
+  vol:null, sub:[], ev:null, visto:{}, prevSot:0, prevValor:null
+};
+
+// ─── Textos del guion (paso 3) ───
+const GLOS = {
+  zonaG:['Zona G','La categoría que la Municipalidad asigna a cada terreno. Va de G0 (no se construye) a G5 (máxima densidad).','POT, arts. 29-32'],
+  indice:['Índice de edificabilidad','Cuántas veces el área del terreno se puede construir, sumando todos los pisos.','Art. 37; excluye sótanos'],
+  escenario:['Escenarios','Base: lo que se puede construir sin trámites especiales. Ampliado: con incentivos municipales. Máximo: el límite más alto, solo en G4 y G5, con el reglamento de incentivos de 2024.','COM-48-2024 (máximo por verificar)'],
+  bloqueInf:['Bloque inferior','La parte baja del edificio, que puede pegarse a los vecinos.','8 m (G1, G2), 12 m (G3), 16 m (G4, G5)'],
+  bloqueSup:['Bloque superior','La parte alta del edificio, que debe separarse de los vecinos y de la calle.','Separación de 3, 4 o 5 m según zona'],
+  huella:['Huella','El área que ocupa un piso sobre el terreno.','En el modelo: 90% de lo construible por defecto'],
+  permeabilidad:['Permeabilidad','La parte del terreno que debe quedar como tierra natural, sin construcción ni sótano, para que el agua de lluvia se filtre.','70% G1, 40% G2, 10% G3, 0% G4 y G5'],
+  sotano:['Sótano','Un piso que no sobresale más de 1.20 m del terreno. No cuenta en los metros permitidos.','Arts. 4 y 37'],
+  incentivos:['Incentivos','Metros y altura adicionales que la Municipalidad concede si el proyecto cumple ciertas prácticas.','COM-48-2024'],
+  caucion:['Seguro de caución','Una garantía que el desarrollador contrata para asegurar que cumplirá lo prometido a cambio de los incentivos.','5% del valor de construcción obtenido por incentivos'],
+  valor:['Valor del terreno','Lo máximo que un desarrollador podría pagar: lo que vendería, menos lo que cuesta construir, menos su ganancia.','Método residual; margen 25% sobre inversión'],
+  dct:['DCT','La oficina municipal que aprueba las licencias de construcción.','Dirección de Control Territorial'],
+  junta:['Junta Directiva y consulta a vecinos','Un trámite especial, más largo, para lo que se sale de la norma directa.','Junta Directiva de Ordenamiento Territorial'],
+  fantasma:['Lo que permite la norma','La caja punteada muestra el máximo que la norma permite en el escenario elegido.','Convención del modelo']
+};
+
+// ─── Carga del predio ───
+function lonLatLocal(ring, cx, cy){
+  const kx = 111320*Math.cos(cy*Math.PI/180), ky = 110574;
+  return ring.map(([x,y]) => [(x-cx)*kx, (y-cy)*ky]);
+}
+function centroide(ring){ return [ring.reduce((s,p)=>s+p[0],0)/ring.length, ring.reduce((s,p)=>s+p[1],0)/ring.length]; }
+function rectangulo(w,l){ return [[-w/2,-l/2],[w/2,-l/2],[w/2,l/2],[-w/2,l/2]]; }
+function zpNorm(v){ if(!v) return null; v=String(v); return v.startsWith('z') ? v : 'z'+String(parseInt(v,10)).padStart(2,'0'); }
+
+async function cargarPredio(){
+  const q = new URLSearchParams(location.search);
+  const ncm = q.get('ncm'), c = q.get('c'), zona = q.get('zona');
+  S.zp = zpNorm(q.get('zona_postal'));
+  S.ancho = parseFloat(q.get('ancho')) || null; S.largo = parseFloat(q.get('largo')) || null;
+  if(ncm && c){
+    const [lon,lat] = c.split(',').map(parseFloat);
+    try{
+      const CELL = 0.004, d = 0.0016, claves = new Set();
+      for(const dx of [-d,0,d]) for(const dy of [-d,0,d]) claves.add(Math.floor((lon+dx)/CELL)+'_'+Math.floor((lat+dy)/CELL));
+      const res = await Promise.all([...claves].map(k => fetch('formas/'+k+'.json').then(r => r.ok ? r.json() : null).catch(() => null)));
+      const todos = res.filter(Boolean).flatMap(r => r.predios);
+      const p = todos.find(x => String(x.n) === String(ncm));
+      if(p){
+        const [cx,cy] = centroide(p.r);
+        S.paths = [lonLatLocal(p.r,cx,cy)]; S.ncm = p.n; S.zonaG = zona || p.g;
+        S.vecinos = todos.filter(x => x.n !== p.n).map(x => ({g:x.g, r:lonLatLocal(x.r,cx,cy)}))
+          .filter(v => { const [mx,my] = centroide(v.r); return Math.hypot(mx,my) < 150; });
+        S.fuente = 'Forma real del predio';
+      }
+    }catch(e){ /* sigue con el rectángulo */ }
+  }
+  if(!S.paths && zona && (S.ancho && S.largo || q.get('area'))){
+    const area = parseFloat(q.get('area')) || S.ancho*S.largo;
+    const w = S.ancho || Math.sqrt(area), l = S.largo || area/w;
+    S.paths = [rectangulo(w,l)]; S.zonaG = zona; S.ncm = ncm;
+    S.fuente = 'No encontramos la forma de este predio: lo dibujamos como un rectángulo de ' + Math.round(w) + ' × ' + Math.round(l) + ' m.';
+  }
+  if(!S.paths){
+    S.demo = true; S.paths = [DEMO.predio]; S.vecinos = DEMO.vecinos; S.zonaG = 'G4'; S.zp = S.zp || 'z10'; S.ncm = '100201032';
+    S.fuente = 'Ejemplo con un predio de zona 10. Abrí esta herramienta desde el Mapa POT para ver tu terreno.';
+  }
+  S.A = M.areaAbs(S.paths);
+  if(!S.ancho){ const r = minRect(S.paths[0]); S.ancho = r[0]; S.largo = r[1]; }
+}
+// Rectángulo mínimo aproximado: orientado según cada lado del polígono
+function minRect(ring){
+  let best = [Infinity, Infinity, Infinity];
+  for(let i=0;i<ring.length;i++){
+    const [ax,ay] = ring[i], [bx,by] = ring[(i+1)%ring.length], a = Math.atan2(by-ay, bx-ax), c = Math.cos(-a), s = Math.sin(-a);
+    let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+    ring.forEach(([x,y]) => { const u=x*c-y*s, v=x*s+y*c; x0=Math.min(x0,u);x1=Math.max(x1,u);y0=Math.min(y0,v);y1=Math.max(y1,v); });
+    const ar=(x1-x0)*(y1-y0); if(ar<best[2]) best=[Math.min(x1-x0,y1-y0), Math.max(x1-x0,y1-y0), ar];
+  }
+  return best;
+}
+
+// ─── Cálculo ───
+function calcular(){
+  const g = M.POT[S.zonaG];
+  S.vol = M.volumetria({paths:S.paths, zonaG:S.zonaG, esc:S.esc, hPiso:S.hPiso, huellaPct:S.huella});
+  S.n = Math.max(0, Math.min(S.n, S.vol.niveles.length));
+  S.sub = S.vol.niveles.slice(0, S.n);
+  const m2 = S.sub.length ? S.sub[S.sub.length-1].acum : 0;
+  const escEf = S.sub.some(l => l.cat==='maximo') ? 'maximo' : S.sub.some(l => l.cat!=='base') ? 'ampliado' : 'base';
+  const pv = S.zp ? M.LAB1_VENTA[S.zp] : null;
+  S.ev = S.n ? M.evaluarVolumetria(Object.assign({}, S.vol, {niveles:S.sub, m2}), {zonaG:S.zonaG, esc:escEf, plazasU:S.pu, pv}) : null;
+  S.m2 = m2; S.alt = S.n ? S.sub[S.n-1].z1 : 0; S.escEf = escEf; S.pv = pv;
+  S.lim = M.limitesEscenario(S.zonaG, S.esc);
+}
+
+// ─── Escena 3D ───
+const vista = $('#vista'), cv = $('#c');
+const r = new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:true});
+r.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+const scene = new THREE.Scene();
+scene.add(new THREE.AmbientLight(0xffffff, .78));
+const sol = new THREE.DirectionalLight(0xffffff, .32); sol.position.set(-60,120,90); scene.add(sol);
+const cam = new THREE.OrthographicCamera(-1,1,1,-1,-3000,3000);
+const res = new THREE.Vector2(1,1);
+let dyn = new THREE.Group(); scene.add(dyn);
+let amb = null, pedido = false;
+const lineMats = [];
+
+function shape(ring){ const s=new THREE.Shape(); ring.forEach(([x,y],i)=> i ? s.lineTo(x,y) : s.moveTo(x,y)); return s; }
+function linea(pos, color, w, dashed, oculto){
+  const lg = new THREE.LineSegmentsGeometry().setPositions(pos);
+  const lm = new THREE.LineMaterial({color, linewidth:w, resolution:res, dashed:!!dashed, dashSize:1.6, gapSize:1.2, depthTest:!dashed || !!oculto});
+  const l = new THREE.LineSegments2(lg, lm);
+  if(dashed){ l.computeLineDistances(); lm.defines.USE_DASH=''; lm.needsUpdate=true; l.renderOrder=5; }
+  lineMats.push(lm); return l;
+}
+function prisma(grp, ring, z0, h, fill, line, lw, op, dashed, oculto){
+  if(h <= 0.01) return;
+  const g = new THREE.ExtrudeGeometry(shape(ring), {depth:h, bevelEnabled:false});
+  g.rotateX(-Math.PI/2); g.translate(0, z0, 0);
+  if(fill !== null && fill !== undefined){
+    grp.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({color:fill, transparent:op<1, opacity:op, depthWrite:op>=1, polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1})));
+  }
+  if(line !== null){ const e = new THREE.EdgesGeometry(g, 25); grp.add(linea(e.attributes.position.array, line, lw, dashed, oculto)); }
+}
+const mayor = paths => paths.reduce((a,b) => M.areaAbs([b]) > M.areaAbs([a]) ? b : a, paths[0]);
+
+function construirEscena(){
+  scene.remove(dyn); dyn.traverse(o => { if(o.geometry) o.geometry.dispose(); }); lineMats.length = 0;
+  dyn = new THREE.Group(); scene.add(dyn);
+  const g = M.POT[S.zonaG], zc = ZC[S.zonaG], simple = S.modo==='simple';
+  const predio = S.paths[0];
+  if(S.show.vec) S.vecinos.forEach(v => prisma(dyn, v.r, -0.3, 0.3, 0xdcdcd8, 0xc6c6c1, 1, 1));
+  prisma(dyn, predio, -0.3, 0.35, tint(zc,.45), 0x0a0a0a, 2.2, 1);
+  if(!g) return;
+  const rInf = mayor(S.vol.inf), rSup = S.vol.sup.length ? mayor(S.vol.sup) : null;
+  // Edificio agrupado por bloque y categoría
+  const grupos = [];
+  S.sub.forEach(n => { const k = n.bloque + (n.cat==='base'?'b':'i'); const u = grupos[grupos.length-1];
+    if(u && u.k===k){ u.z1=n.z1; u.n.push(n); } else grupos.push({k, z0:n.z0, z1:n.z1, n:[n], bloque:n.bloque, inc:n.cat!=='base'}); });
+  grupos.forEach(G => {
+    const ring = G.bloque==='inferior' ? rInf : rSup; if(!ring) return;
+    const parcial = G.n[G.n.length-1].parcial;
+    prisma(dyn, ring, G.z0+0.04, G.z1-G.z0-0.08, G.inc ? tint(AZUL,.20) : tint(zc,.20), G.inc ? AZUL : 0x0a0a0a, simple?2:1.6, 1);
+    G.n.slice(1).forEach(n => {
+      const pts=[]; for(let i=0;i<ring.length;i++){ const p=ring[i], q=ring[(i+1)%ring.length]; pts.push(p[0],n.z0,-p[1], q[0],n.z0,-q[1]); }
+      dyn.add(linea(pts, simple ? (G.inc?0xa9bdf0:tint(zc,.55).getHex()) : (G.inc?AZUL:0x0a0a0a), simple?1:1.3));
+    });
+    if(parcial && !simple){ /* el último nivel parcial se dibuja completo; su área real está en la tabla */ }
   });
-
-  map.addLayer({
-    id: 'predios-fill',
-    type: 'fill',
-    source: 'predios',
-    'source-layer': 'predios',
-    paint: {
-      'fill-color': [
-        'match', ['get', 'zona_g'],
-        'G0','#2d7a1f','G1','#5aab2e','G2','#c8d400',
-        'G3','#f5d800','G4','#f59100','G5','#e02020','#cccccc'
-      ],
-      'fill-opacity': ['interpolate',['linear'],['zoom'], 10,0.75, 16,0.55]
-    }
-  }, primeraEtiqueta);
-
-  map.addLayer({
-    id: 'predios-line',
-    type: 'line',
-    source: 'predios',
-    'source-layer': 'predios',
-    minzoom: 14,
-    paint: { 'line-color':'#fff','line-width':0.6,'line-opacity':0.5 }
-  }, primeraEtiqueta);
-
-  map.addLayer({
-    id: 'predios-hover',
-    type: 'fill',
-    source: 'predios',
-    'source-layer': 'predios',
-    paint: {
-      'fill-color': '#0a0a0a',
-      'fill-opacity': ['case',['boolean',['feature-state','hover'],false],0.25,0]
-    }
-  }, primeraEtiqueta);
-
-  // Contorno del predio seleccionado
-  map.addLayer({
-    id: 'predios-selected',
-    type: 'line',
-    source: 'predios',
-    'source-layer': 'predios',
-    paint: {
-      'line-color': '#0a0a0a',
-      'line-width': 2.5,
-      'line-opacity': ['case',['boolean',['feature-state','selected'],false],1,0]
-    }
-  }, primeraEtiqueta);
-
-  map.on('zoom', () => {
-    const z = map.getZoom();
-    document.getElementById('zoom-hint').style.display = z < 13 ? 'block' : 'none';
-  });
-});
-
-// Hover
-let hoveredId = null;
-map.on('mousemove', 'predios-fill', e => {
-  map.getCanvas().style.cursor = 'pointer';
-  if (e.features.length > 0) {
-    if (hoveredId !== null) {
-      map.setFeatureState({ source:'predios', sourceLayer:'predios', id: hoveredId }, { hover: false });
-    }
-    hoveredId = e.features[0].id;
-    map.setFeatureState({ source:'predios', sourceLayer:'predios', id: hoveredId }, { hover: true });
+  // Sótanos
+  const nSot = S.ev ? S.ev.sot.niveles : 0;
+  const rSot = g.perm > 0 ? mayor(M.insetHastaArea(S.paths, S.A*(1-g.perm)).paths) : predio;
+  if(S.show.sot && nSot){
+    if(simple) prisma(dyn, rSot, -0.35-nSot*3, nSot*3-0.1, 0xcfcfcb, 0x8a8a86, 1.2, 0.35, true);
+    else for(let i=1;i<=nSot;i++) prisma(dyn, rSot, -0.35-i*3, 2.9, 0xcfcfcb, 0x8a8a86, 1.2, 0.35, true);
   }
-});
-map.on('mouseleave', 'predios-fill', () => {
-  map.getCanvas().style.cursor = '';
-  if (hoveredId !== null) {
-    map.setFeatureState({ source:'predios', sourceLayer:'predios', id: hoveredId }, { hover: false });
-    hoveredId = null;
-  }
-});
-
-// Click en predio — muestra ficha + botón calculadora
-let selectedId = null;
-map.on('click', 'predios-fill', e => {
-  if (!e.features.length) return;
-  const feat = e.features[0];
-  const p = feat.properties;
-  const g = p.zona_g;
-  const color = COLORS[g] || '#ccc';
-  const tc = TEXT_COLORS[g] || '#000';
-
-  // Marcar como seleccionado
-  if (selectedId !== null) {
-    map.setFeatureState({ source:'predios', sourceLayer:'predios', id: selectedId }, { selected: false });
-  }
-  selectedId = feat.id;
-  map.setFeatureState({ source:'predios', sourceLayer:'predios', id: selectedId }, { selected: true });
-
-  // Área construible máxima
-  // V2: base (sin trámites) = lo que usa la calculadora; máximo = con incentivos
-  const ie = p.ie_max || IE_REF[g] || '—';
-  const ieBase = IE_REF[g];
-  const construible = (p.area_m2 && ieBase)
-    ? Math.round(p.area_m2 * ieBase).toLocaleString('es-GT') + ' m²'
-    : '—';
-  const construibleMax = (p.area_m2 && p.ie_max && p.ie_max > ieBase)
-    ? Math.round(p.area_m2 * p.ie_max).toLocaleString('es-GT') + ' m²'
-    : null;
-
-  // URL de la calculadora con datos del predio
-  const calcURL = buildCalcURL(p, g);
-  const url3D = build3DURL(p, g, feat);
-
-  document.getElementById('panel').innerHTML = `
-    <h3>Predio seleccionado</h3>
-
-    <div class="row">
-      <span class="lbl">NCM</span>
-      <span class="val" style="font-family:monospace;font-size:10px;letter-spacing:0.02em">${p.ncm || '—'}</span>
-    </div>
-    <div class="row">
-      <span class="lbl">Zona G</span>
-      <span class="badge" style="background:${color};color:${tc}">${g}</span>
-    </div>
-    <div class="row">
-      <span class="lbl">Uso</span>
-      <span class="val" style="font-size:10px">${DESCS[g] || '—'}</span>
-    </div>
-    <div class="row">
-      <span class="lbl">Zona municipal</span>
-      <span class="val">Zona ${p.zona || '—'}</span>
-    </div>
-    <div class="row">
-      <span class="lbl">Área del predio</span>
-      <span class="val">${p.area_m2 ? Number(p.area_m2).toLocaleString('es-GT') + ' m²' : '—'}</span>
-    </div>
-    <div class="row">
-      <span class="lbl">IE máx. (con incentivos)</span>
-      <span class="val">${p.ie_max != null ? p.ie_max + 'x' : '—'}</span>
-    </div>
-    <div class="row">
-      <span class="lbl">Medidas aprox.</span>
-      <span class="val">${p.ancho && p.largo ? Math.round(p.ancho) + ' × ' + Math.round(p.largo) + ' m' : '—'}</span>
-    </div>
-    ${p.regular != null && p.regular < 0.85 ? '<div class="row"><span class="lbl" style="text-transform:none;letter-spacing:0">Forma irregular: medidas aproximadas</span></div>' : ''}
-    <div class="row" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
-      <span class="lbl">Altura permitida</span>
-      <span class="val">${p.alt_perm ? p.alt_perm + ' m' : '—'}</span>
-    </div>
-
-    <div class="metric">
-      <div class="metric-label">Área construible (base)</div>
-      <div class="metric-value">${construible}</div>
-      <div class="metric-sub">IE ${ieBase != null ? ieBase + 'x' : '—'} × ${p.area_m2 ? Number(p.area_m2).toLocaleString('es-GT') + ' m²' : '—'} de terreno${construibleMax ? '<br>Con incentivos: hasta ' + construibleMax + ' (IE ' + p.ie_max + 'x)' : ''}</div>
-    </div>
-
-    <a class="btn-calcular" href="${calcURL}" target="_blank" rel="noopener">
-      <span>Calcular potencial</span>
-      <span>→</span>
-    </a>
-    <a class="btn-calcular-sub" href="${url3D}" target="_blank" rel="noopener">
-      <span>Ver en 3D</span>
-      <span>→</span>
-    </a>
-    <a class="btn-calcular-sub" href="${calcURL}&modo=pro" target="_blank" rel="noopener">
-      <span>Abrir en modo Pro</span>
-      <span>→</span>
-    </a>
-  `;
-});
-
-// Click fuera de predio — limpiar panel
-map.on('click', e => {
-  const f = map.queryRenderedFeatures(e.point, { layers: ['predios-fill'] });
-  if (!f.length) {
-    if (selectedId !== null) {
-      map.setFeatureState({ source:'predios', sourceLayer:'predios', id: selectedId }, { selected: false });
-      selectedId = null;
-    }
-    document.getElementById('panel').innerHTML = `
-      <h3>Predio</h3>
-      <div class="hint">Hacé clic en un predio<br>para ver su ficha.</div>
-    `;
-  }
-});
-
-// Filtros leyenda
-document.querySelectorAll('.li[data-zona]').forEach(el => {
-  el.addEventListener('click', () => {
-    const zona = el.dataset.zona;
-    if (activeZonas.has(zona)) {
-      activeZonas.delete(zona);
-      el.classList.add('off');
+  // Lo que permite la norma (volumen fantasma del escenario elegido)
+  if(S.show.fant){
+    const env = mayor(M.insetPaths(S.paths, g.sepBS)), top = S.lim.alt, gc = 0x8a8a86;
+    if(simple){
+      if(S.alt < g.bs) prisma(dyn, predio, S.alt, g.bs-S.alt, null, gc, 1, 1, true, true);
+      prisma(dyn, env, Math.max(S.alt, g.bs), top-Math.max(S.alt, g.bs), null, gc, 1, 1, true, true);
     } else {
-      activeZonas.add(zona);
-      el.classList.remove('off');
+      prisma(dyn, predio, 0, g.bs, null, gc, 1, 1, true);
+      prisma(dyn, env, g.bs, top-g.bs, null, gc, 1, 1, true);
     }
-    if (map.getLayer('predios-fill')) {
-      map.setFilter('predios-fill', buildFilter());
-      map.setFilter('predios-line', buildFilter());
-      map.setFilter('predios-hover', buildFilter());
-      map.setFilter('predios-selected', buildFilter());
-    }
+  }
+  if(S.show.amb && S.vecinos.length){ if(!amb) amb = crearAmbiente(); dyn.add(amb.clone()); }
+  pedirRender();
+}
+
+// Figuras a escala: gris claro, solo fuera de los predios
+function crearAmbiente(){
+  const grp = new THREE.Group(), polys = [S.paths[0]].concat(S.vecinos.map(v => v.r));
+  const dentro = (x,y,rg) => { let c=false; for(let i=0,j=rg.length-1;i<rg.length;j=i++){ const [xi,yi]=rg[i],[xj,yj]=rg[j]; if(((yi>y)!=(yj>y)) && (x<(xj-xi)*(y-yi)/(yj-yi)+xi)) c=!c; } return c; };
+  const dSeg = (px,py,[ax,ay],[bx,by]) => { const dx=bx-ax, dy=by-ay, t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy||1))); return [Math.hypot(px-ax-t*dx, py-ay-t*dy), Math.atan2(dy,dx)]; };
+  const libre = [];
+  for(let x=-95;x<=95;x+=2.5) for(let y=-95;y<=95;y+=2.5){
+    if(polys.some(rg => dentro(x,y,rg))) continue;
+    let dm=1e9, ang=0; polys.forEach(rg => { for(let i=0;i<rg.length;i++){ const [d,a]=dSeg(x,y,rg[i],rg[(i+1)%rg.length]); if(d<dm){dm=d;ang=a;} } });
+    if(dm<25) libre.push({x,y,d:dm,ang});
+  }
+  let seed=7; const rnd = () => (seed=(seed*16807)%2147483647)/2147483647;
+  const lejos = (p,arr,m) => arr.every(q => Math.hypot(p.x-q.x,p.y-q.y) > m);
+  const mat = c => new THREE.MeshLambertMaterial({color:c});
+  const autos=[]; libre.filter(p=>p.d>=3&&p.d<=6).sort(()=>rnd()-.5).forEach(p=>{ if(autos.length<9 && lejos(p,autos,11)) autos.push(p); });
+  autos.forEach((p,i) => { const bus=i===0, L=bus?11:4.4, A=bus?2.5:1.8, H=bus?3:1, g=new THREE.Group();
+    const b=new THREE.Mesh(new THREE.BoxGeometry(L,H,A), mat(0xd2d2cd)); b.position.y=H/2+.3; g.add(b);
+    if(!bus){ const c=new THREE.Mesh(new THREE.BoxGeometry(L*.5,.6,A*.92), mat(0xbdbdb8)); c.position.set(-.2,H+.6,0); g.add(c); }
+    g.position.set(p.x,0,-p.y); g.rotation.y=p.ang; grp.add(g); });
+  const arb=[]; libre.filter(p=>p.d>=.8&&p.d<=2.2).sort(()=>rnd()-.5).forEach(p=>{ if(arb.length<34 && lejos(p,arb,9) && lejos(p,autos,4)) arb.push(p); });
+  arb.forEach(p => { const h=5+rnd()*2.5, rc=1.8+rnd();
+    const t=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,h*.55,6), mat(0xbdbdb8)); t.position.set(p.x,h*.275,-p.y); grp.add(t);
+    const c=new THREE.Mesh(new THREE.SphereGeometry(rc,12,8), mat(0xcfd6cb)); c.position.set(p.x,h*.55+rc*.8,-p.y); c.scale.y=1.1; grp.add(c); });
+  const gente=[]; libre.filter(p=>p.d>=.6&&p.d<=2.5&&Math.hypot(p.x,p.y)<60).sort(()=>rnd()-.5).forEach(p=>{ if(gente.length<16 && lejos(p,gente,3) && lejos(p,arb,1.5)) gente.push(p); });
+  gente.forEach(p => { const h=1.6+rnd()*.2;
+    const b=new THREE.Mesh(new THREE.CylinderGeometry(.2,.24,h*.8,8), mat(0xa9a9a4)); b.position.set(p.x,h*.4,-p.y); grp.add(b);
+    const c=new THREE.Mesh(new THREE.SphereGeometry(.14,8,6), mat(0xa9a9a4)); c.position.set(p.x,h*.8+.12,-p.y); grp.add(c); });
+  return grp;
+}
+
+// ─── Cámara ───
+let az = 0.68, el = 0.62, zoom = 1, fr = 60;
+function ajustarCamara(){
+  const w = vista.clientWidth, h = vista.clientHeight; if(!w || !h || !S.paths) return;
+  r.setSize(w, h, false); res.set(w, h); lineMats.forEach(m => m.resolution.set(w, h));
+  const bb = new THREE.Box3(); S.paths[0].forEach(([x,y]) => bb.expandByPoint(new THREE.Vector3(x,0,-y)));
+  const lado = Math.max(bb.max.x-bb.min.x, bb.max.z-bb.min.z);
+  fr = Math.max(lado*0.95, 45, (S.lim ? S.lim.alt : 30)*0.75);
+  const asp = w/h; cam.left=-fr*asp; cam.right=fr*asp; cam.top=fr; cam.bottom=-fr; cam.zoom=zoom; cam.updateProjectionMatrix();
+  posCam();
+}
+function posCam(){
+  const d = 500, y0 = Math.min(S.alt || 10, 40)*0.35;
+  cam.position.set(Math.sin(az)*Math.cos(el)*d, Math.sin(el)*d + y0, Math.cos(az)*Math.cos(el)*d);
+  cam.lookAt(0, y0, 0); cam.zoom = zoom; cam.updateProjectionMatrix(); pedirRender();
+}
+function ponerVista(v){
+  S.vista = v; $$('#vistas [data-vista]').forEach(b => b.classList.toggle('sel', b.dataset.vista===v));
+  if(v==='axo'){ az=.68; el=.62; } else if(v==='aerea'){ az=0; el=1.53; } else { az=.35; el=.06; }
+  posCam();
+}
+// Mouse, dedo y pellizco
+const pts = new Map(); let pinch0 = 0, zoom0 = 1;
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(pts.size===2){ const [a,b]=[...pts.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); zoom0=zoom; } });
+cv.addEventListener('pointermove', e => { if(!pts.has(e.pointerId)) return; const p=pts.get(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pts.size===1){ az -= (e.clientX-p.x)*.006; el = Math.min(1.55, Math.max(.03, el+(e.clientY-p.y)*.004)); posCam(); }
+  else if(pts.size===2 && pinch0){ const [a,b]=[...pts.values()]; zoom = Math.min(6, Math.max(.4, zoom0*Math.hypot(a.x-b.x,a.y-b.y)/pinch0)); posCam(); } });
+const fin = e => { pts.delete(e.pointerId); if(pts.size<2) pinch0=0; };
+cv.addEventListener('pointerup', fin); cv.addEventListener('pointercancel', fin);
+cv.addEventListener('wheel', e => { e.preventDefault(); zoom = Math.min(6, Math.max(.4, zoom*(1-e.deltaY*.0012))); posCam(); }, {passive:false});
+
+// ─── Etiquetas con línea guía ───
+function bbox(ring){ const xs=ring.map(p=>p[0]), ys=ring.map(p=>p[1]); return {x0:Math.min(...xs), x1:Math.max(...xs), z0:-Math.max(...ys), z1:-Math.min(...ys)}; }
+function etiquetas(){
+  const tags = $('#tags'), svg = $('#guias'); tags.innerHTML=''; svg.innerHTML='';
+  if(!S.show.etq || !M.POT[S.zonaG]) return;
+  const w = vista.clientWidth, h = vista.clientHeight, g = M.POT[S.zonaG], simple = S.modo==='simple';
+  const bP = bbox(S.paths[0]), rSup = S.vol.sup.length ? mayor(S.vol.sup) : S.paths[0], bS = bbox(rSup);
+  const cx = (bP.x0+bP.x1)/2, cz = (bP.z0+bP.z1)/2, L = [];
+  const zonaTxt = 'zona ' + S.zonaG;
+  // Vértice del predio más cercano a la cámara (sirve también en formas irregulares)
+  const vx = S.paths[0].reduce((a,p) => (p[0]-p[1]) > (a[0]-a[1]) ? p : a);
+  L.push([simple ? 'Tu terreno · ' + zonaTxt : S.zonaG + ' · ' + fmt(S.A) + ' m²', [vx[0]*0.92, 0, -vx[1]*0.92], 150, 40]);
+  if(S.n){
+    const base = S.sub.filter(n=>n.cat==='base'), inc = S.sub.filter(n=>n.cat!=='base');
+    if(base.length) L.push([simple ? 'Pisos sin trámites especiales' : 'Base · ' + base.length + ' niveles', [cx-8, Math.min(base[base.length-1].z1, g.bs)/2, bP.z1-3], -300, -20]);
+    if(inc.length) L.push([simple ? 'Pisos que necesitan incentivos' : 'Con incentivos · ' + inc.length + ' niveles', [bP.x1, (inc[0].z0+inc[inc.length-1].z1)/2, cz+8], 200, -40, 'acc']);
+    L.push([S.alt + ' m de altura', [bS.x1, S.alt, bS.z0+6], 180, -50, 'neg']);
+    if(!simple && S.sub.some(n=>n.bloque==='superior')) L.push(['Bloque superior · retiro ' + g.sepBS + ' m', [bS.x0, S.alt-1.5, (bS.z0+bS.z1)/2], -210, 45]);
+  }
+  if(S.show.sot && S.ev && S.ev.sot.niveles) L.push([S.ev.sot.niveles + (simple ? ' sótanos de parqueo' : ' sótanos · ' + S.ev.est.total + ' parqueos'), [0, -S.ev.sot.niveles*1.5, 0], -120, 110]);
+  if(S.show.fant) L.push([simple ? (w < 560 ? 'Permitido · hasta ' : 'Espacio que aún permite la norma · hasta ') + S.lim.alt + ' m' : 'Máximo del escenario · ' + S.lim.alt + ' m', [bS.x0, Math.max(S.alt, S.lim.alt*0.8), bS.z1], -170, -40]);
+  L.forEach(([t,p,dx,dy,c]) => {
+    const v = new THREE.Vector3(...p).project(cam); if(v.z > 1) return;
+    let px = (v.x+1)/2*w, py = (-v.y+1)/2*h;
+    const k = w < 560 ? .45 : 1;
+    const d = document.createElement('div'); d.className = 'tag ' + (c||''); d.textContent = t; tags.appendChild(d);
+    const hw = d.offsetWidth/2 + 6, lx = Math.min(w-hw, Math.max(hw, px+dx*k)), ly = Math.min(h-24, Math.max(w < 560 ? 110 : 70, py+dy*k));
+    d.style.left = lx+'px'; d.style.top = ly+'px';
+    const col = c==='acc' ? '#2f5bd3' : '#0a0a0a';
+    svg.insertAdjacentHTML('beforeend', `<line x1="${px}" y1="${py}" x2="${lx}" y2="${ly}" stroke="${col}" stroke-width="1"/><circle cx="${px}" cy="${py}" r="3" fill="${col}"/>`);
   });
+}
+function pedirRender(){ if(pedido || !S.vol) return; pedido = true; requestAnimationFrame(() => { pedido = false; r.render(scene, cam); etiquetas(); }); }
+new ResizeObserver(() => ajustarCamara()).observe(vista);
+
+// ─── Panel ───
+function panel(){
+  const g = M.POT[S.zonaG], simple = S.modo==='simple';
+  $('#predio').innerHTML = (S.ncm ? 'NCM ' + S.ncm + ' · ' : '') + '<span class="g" data-g="zonaG">' + S.zonaG + '</span> · ' + fmt(S.A) + ' m²' + (S.zp ? ' · zona ' + parseInt(S.zp.slice(1),10) : '');
+  $$('[data-esc]').forEach(b => { const noMax = b.dataset.esc==='maximo' && !(g && g.ie_max); b.disabled = noMax; b.classList.toggle('sel', b.dataset.esc===S.esc); });
+  $$('[data-pu]').forEach(b => b.classList.toggle('sel', +b.dataset.pu===S.pu));
+  $$('[data-modo]').forEach(b => b.classList.toggle('sel', b.dataset.modo===S.modo));
+  document.body.classList.toggle('tecnico', !simple);
+  const mas = $('#mas'); mas.disabled = !g || S.n >= S.vol.niveles.length; $('#menos').disabled = S.n <= 0; $('#llenar').disabled = mas.disabled;
+  $('#niv b').textContent = 'Nivel ' + S.n; $('#niv span').textContent = S.alt + ' m de ' + (S.lim ? S.lim.alt : 0) + ' m';
+  if(!g){ $('#cifras').innerHTML=''; $('#barra').innerHTML=''; return; }
+  // Barra de metros permitidos
+  const tope = (g.ie_max || g.ie_a) * S.A, fB = g.ie*S.A/tope*100, fA = (g.ie_a-g.ie)*S.A/tope*100, fM = 100-fB-fA, uso = S.m2/tope*100;
+  $('#barra').innerHTML = `<i style="width:${Math.min(uso,fB)}%;background:${'#'+tint(ZC[S.zonaG],.55).getHexString()}"></i><i style="width:${Math.max(0,Math.min(uso,fB+fA)-fB)}%;background:#a9bdf0"></i><i style="width:${Math.max(0,uso-fB-fA)}%;background:#6f8fe0"></i>` +
+    `<span class="marca" style="left:${fB}%"></span>` + (g.ie_max ? `<span class="marca" style="left:${fB+fA}%"></span>` : '');
+  $('#barra-lbl').innerHTML = `<span>Base ${fmt(g.ie*S.A)} m²</span><span>Ampliado ${fmt(g.ie_a*S.A)}</span>` + (g.ie_max ? `<span>Máximo* ${fmt(g.ie_max*S.A)}</span>` : '');
+  $('#pct').textContent = Math.round(S.m2/(g.ie*S.A)*100) + '% del base';
+  // Cifras
+  const ev = S.ev, libre = Math.round((1 - (S.n ? S.vol.aInf : 0)/S.A)*100);
+  const valor = !S.n ? '—' : !S.pv ? 'Elegí zona postal' : ev.valor > 0 ? usdM(ev.valor) : 'No cierra';
+  const proc = !S.n ? '' : S.escEf==='base' ? 'DCT, vía directa' : 'DCT con incentivos o Junta + vecinos';
+  let h = `<div class="cif"><b>${fmt(S.m2)} m²</b><span>Construidos</span></div>
+    <div class="cif"><b>${S.n} · ${S.alt} m</b><span>Niveles · altura</span></div>
+    <div class="cif"><b>${ev ? ev.est.total : 0} · ${ev ? ev.sot.niveles : 0}</b><span>Parqueos · <span class="g" data-g="sotano">sótanos</span></span></div>
+    <div class="cif"><b>${libre}%</b><span>Terreno libre</span></div>`;
+  if(!simple && S.n){
+    const lado = Math.max(1.5, g.bs/4);
+    h += `<div class="cif"><b>IE ${(S.m2/S.A).toFixed(2)} de ${S.lim.ie}</b><span><span class="g" data-g="indice">Índice</span> usado</span></div>
+      <div class="cif"><b>${g.bs} m · ${g.sepBS} m</b><span><span class="g" data-g="bloqueInf">Bloque inferior</span> · <span class="g" data-g="bloqueSup">separación</span></span></div>
+      <div class="cif"><b>${ev.est.total} (mín. ${ev.est.norma})</b><span>Plazas de parqueo</span></div>
+      <div class="cif"><b>${lado.toFixed(1)} m</b><span>Lado mín. de patios</span></div>`;
+    if(ev.C.cCau > 0) h += `<div class="cif full" style="border:var(--soft)"><b style="font-size:16px">US$${fmt(ev.C.cCau)}</b><span><span class="g" data-g="caucion">Seguro de caución</span> (5% de lo obtenido por incentivos)</span></div>`;
+  }
+  h += `<div class="cif full"><b>${valor}</b><span><span class="g" data-g="valor">Lo máximo que un desarrollador podría pagar</span>${proc ? ' · aprobación: ' + proc : ''}</span></div>`;
+  $('#cifras').innerHTML = h;
+  // Tabla por nivel
+  const filas = S.sub.slice().reverse().map(n => `<tr><td>${n.n}</td><td>${n.bloque==='inferior'?'Inferior':'Superior'}</td><td>${fmt(n.area)}</td><td>${fmt(n.acum)}</td><td>${n.cat==='base'?'Base':n.cat==='ampliado'?'Ampl.':'Máx.*'}</td></tr>`).join('');
+  $('#tabla').innerHTML = `<thead><tr><th>Nivel</th><th>Bloque</th><th>m²</th><th>Acum.</th><th>Escen.</th></tr></thead><tbody>${filas || '<tr><td colspan="5">Agregá niveles con +</td></tr>'}</tbody>`;
+  // Enlace a la calculadora
+  const qp = new URLSearchParams({zona:S.zonaG, area:Math.round(S.A), ancho:Math.round(S.ancho), largo:Math.round(S.largo)});
+  if(S.zp) qp.set('zona_postal', parseInt(S.zp.slice(1),10));
+  $('#link-calc').href = 'https://calculadora-pot.umbralgt.com?' + qp.toString();
+}
+
+// ─── Frases de umbral (guion, paso 3) ───
+let tUmbral = null;
+function decir(txt, acc){
+  const u = $('#umbral'); u.querySelector('p').textContent = txt; u.classList.toggle('acc', !!acc); u.style.display = 'block';
+  clearTimeout(tUmbral); tUmbral = setTimeout(() => { u.style.display = 'none'; }, 9000);
+}
+$('#umbral .x').onclick = () => { $('#umbral').style.display = 'none'; };
+function unaVez(k, txt, acc){ if(S.visto[k]) return false; S.visto[k] = true; decir(txt, acc); return true; }
+function umbrales(antesN){
+  const g = M.POT[S.zonaG]; if(!g || S.n <= antesN) return;
+  const simple = S.modo==='simple', ult = S.sub[S.n-1], base = g.ie*S.A;
+  if(ult.cat==='maximo') return unaVez('max', simple ? 'Estos pisos usan el reglamento de incentivos de 2024, solo disponible en esta zona.' : 'Escenario máximo (G4 y G5): valores del COM-48-2024 por verificar con el texto oficial.', true);
+  if(ult.cat==='ampliado') return unaVez('inc', simple ? 'Este piso solo es posible con incentivos: el proyecto debe cumplir obligaciones y contratar un seguro.' : `Escenario ampliado: IE hasta ${g.ie_a}, altura hasta ${g.alt_a} m. Seguro de caución del 5% sobre lo obtenido por incentivos (COM-48-2024).`, true);
+  if(ult.bloque==='superior') return unaVez('sup', simple ? `Desde aquí, el edificio debe separarse ${g.sepBS} m de los vecinos y de la calle. Por eso los pisos de arriba son más chicos.` : `Bloque superior desde ${g.bs} m: separación de ${g.sepBS} m a todos los linderos, incluido el espacio vial (arts. 43-47). Una separación menor requiere Junta Directiva con consulta a vecinos.`);
+  if(S.m2 >= base - 1) return unaVez('base', simple ? `Aquí se acaba lo que se puede construir sin trámites especiales: ${fmt(base)} m².` : `Índice base agotado (${g.ie} × ${fmt(S.A)} m²). Lo que sigue requiere incentivos o resolución de Junta.`);
+  if(S.n===1) return unaVez('primer', simple ? `Cada nivel suma ${fmt(ult.area)} m². Llevás ${Math.round(S.m2/base*100)}% de lo que permite la norma.` : `Nivel 1: ${fmt(ult.area)} m². Índice usado: ${(S.m2/S.A).toFixed(2)} de ${g.ie} (base).`);
+}
+function avisoSotano(espera){
+  const n = S.ev ? S.ev.sot.niveles : 0;
+  if(S.silencio){ S.prevSot = n; return; }
+  if(n > S.prevSot && S.prevSot >= 0 && n > 0 && S.n > 1){
+    const nivelActual = S.ev.sot;
+    const costo = (S.ev.sot.areaNivel || S.A) * 700 / 1e6;
+    const txt = S.modo==='simple' ? `Hace falta otro nivel de sótano para los parqueos. Cada uno cuesta alrededor de ${costo.toFixed(1)} millones de dólares.` : `Sótano ${n}: ${nivelActual.porNivel || '—'} plazas por nivel a 30 m² por plaza. Los sótanos no cuentan en el índice (art. 37).`;
+    espera ? setTimeout(() => decir(txt), 5000) : decir(txt);
+  }
+  S.prevSot = n;
+}
+function avisoBloqueo(){
+  const m = S.vol.motivo, simple = S.modo==='simple', resto = S.lim.ie*S.A - S.m2;
+  if(m==='altura') return decir(simple ? 'Ya no se puede subir más: se llegó a la altura máxima de este escenario.' : `Límite de altura del escenario (${S.lim.alt} m).`);
+  if(m==='retiro') return decir(simple ? 'Con la separación que exige la norma, ya no queda espacio para otro piso en este terreno.' : `El retiro de ${M.POT[S.zonaG].sepBS} m deja sin huella al bloque superior.`);
+  if(resto > 25) return decir(simple ? `Quedan ${fmt(resto)} m² permitidos, muy poco para un piso completo. Un arquitecto podría aprovecharlos de otra forma.` : `Remanente de índice: ${fmt(resto)} m² (menos del 25% de una planta).`);
+  decir(simple ? 'Ya no se puede construir más en este escenario: se usaron todos los metros permitidos.' : `Límite de índice del escenario (${S.lim.ie}). Cambiá de escenario para continuar.`);
+}
+function avisosIniciales(){
+  const simple = S.modo==='simple', g = S.zonaG;
+  if(g==='G0') return aviso(simple ? 'En esta zona no se permiten viviendas ni ocupación humana: es un área protegida.' : 'G0: sin usos de ocupación humana (art. 30). Cualquier obra requiere resolución de Junta (art. 42).');
+  const partes = [];
+  if(g==='G1') partes.push(simple ? 'Esta zona protege las laderas: permite construir poco y exige dejar la mayor parte del terreno natural.' : 'G1: IE 1.2, 70% permeable, bloque inferior hasta 8 m (art. 43).');
+  if(g==='G2') partes.push(simple ? 'En esta zona el edificio debe separarse de los vecinos desde el tercer piso.' : 'G2: bloque inferior hasta 8 m; bloque superior a 3 m de todos los linderos (art. 44).');
+  if(S.ancho && S.ancho < 15) partes.push(simple ? 'Este terreno es angosto: las rampas del sótano ocupan mucho espacio y cada nivel rinde pocos parqueos.' : `Ancho de ${Math.round(S.ancho)} m: rampa y doble crujía de estacionamiento difíciles. Verificar con diseño.`);
+  if(S.fuente && !S.fuente.startsWith('Forma real')) partes.unshift(S.fuente);
+  if(partes.length) aviso(partes.join(' '));
+}
+function aviso(t){ const a = $('#aviso'); a.textContent = t; a.style.display = 'block'; setTimeout(() => { a.style.display = 'none'; }, 12000); }
+
+// ─── Actualizar todo ───
+function actualizar(antesN){
+  calcular(); construirEscena(); panel();
+  const dijo = antesN !== undefined ? umbrales(antesN) : false;
+  avisoSotano(dijo);
+  if(S.n && S.pv && S.ev && S.ev.valor === 0) unaVez('nocierra', S.modo==='simple' ? 'Con los precios de venta de esta zona, un edificio de apartamentos no alcanza a pagar sus costos. Aquí conviene pensar en otro tipo de proyecto.' : 'Valor residual del terreno en cero con los supuestos actuales. Revisá precio de venta, parqueos o acabados.');
+  posCam();
+}
+
+// ─── Controles ───
+$('#mas').onclick = () => { if(S.n >= S.vol.niveles.length) return avisoBloqueo(); const a=S.n; S.n++; actualizar(a); if(S.n >= S.vol.niveles.length) setTimeout(avisoBloqueo, 2500); };
+$('#menos').onclick = () => { S.n = Math.max(0, S.n-1); actualizar(); };
+$('#llenar').onclick = () => { const a=S.n; S.n = 999; actualizar(a); setTimeout(avisoBloqueo, 2500); };
+$$('[data-esc]').forEach(b => b.onclick = () => { S.esc = b.dataset.esc; actualizar(); ajustarCamara(); });
+$$('[data-pu]').forEach(b => b.onclick = () => {
+  const antes = S.ev && S.ev.valor; S.pu = +b.dataset.pu; actualizar();
+  if(S.n && S.pv && antes != null) decir(S.modo==='simple' ? `Con ${S.pu} parqueo${S.pu>1?'s':''} por apartamento, el valor del terreno pasa de ${(antes/1e6).toFixed(1)} a ${(S.ev.valor/1e6).toFixed(1)} millones de dólares.` : `Plazas: ${S.ev.est.total} (mínimo municipal: ${S.ev.est.norma}). Sótanos: ${S.ev.sot.niveles}.`);
 });
+$$('[data-modo]').forEach(b => b.onclick = () => { S.modo = b.dataset.modo; actualizar(); });
+$$('[data-show]').forEach(b => b.onclick = () => { const k=b.dataset.show; S.show[k] = !S.show[k]; b.classList.toggle('on', S.show[k]); b.setAttribute('aria-pressed', S.show[k]); construirEscena(); });
+$$('[data-vista]').forEach(b => b.onclick = () => ponerVista(b.dataset.vista));
+$('#h-piso').onchange = e => { S.hPiso = Math.min(6, Math.max(2.6, parseFloat(e.target.value)||3)); e.target.value = S.hPiso; actualizar(); ajustarCamara();
+  if(S.hPiso > 4) decir('Con más de 4 m entre pisos, cada nivel cuenta como dos pisos para la norma (art. 39).'); };
+$('#huella').onchange = e => { S.huella = Math.min(100, Math.max(30, parseFloat(e.target.value)||90))/100; e.target.value = Math.round(S.huella*100); actualizar(); };
+
+$('#btn-mostrar').onclick = () => { const m = $('#mostrar'); m.classList.toggle('abierto'); $('#btn-mostrar').setAttribute('aria-expanded', m.classList.contains('abierto')); };
+if(window.matchMedia('(max-width:768px)').matches) $('#llenar').textContent = 'Llenar';
+
+// ─── Glosario ───
+const pop = $('#pop');
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-g]');
+  if(!t){ if(!e.target.closest('#pop')) pop.style.display='none'; return; }
+  const d = GLOS[t.dataset.g]; if(!d) return;
+  pop.innerHTML = `<b>${d[0]}</b>${d[1]}` + (S.modo==='tecnico' ? `<small>${d[2]}</small>` : '');
+  const rc = t.getBoundingClientRect(); pop.style.display='block';
+  pop.style.left = Math.max(8, Math.min(window.innerWidth-296, rc.left)) + 'px';
+  pop.style.top = (rc.bottom + 6 + pop.offsetHeight > window.innerHeight ? rc.top - pop.offsetHeight - 6 : rc.bottom + 6) + 'px';
+});
+
+// ─── Modales: cierre y supuestos ───
+function modal(html){ $('#modal-c').innerHTML = html; $('#modal').style.display = 'flex'; }
+$('#modal .cerrar').onclick = () => { $('#modal').style.display = 'none'; };
+$('#modal').onclick = e => { if(e.target.id==='modal') $('#modal').style.display = 'none'; };
+$('#btn-cierre').onclick = () => modal(`<h2>Lo que este modelo no decide</h2>
+<p>Hasta aquí viste lo máximo que la norma permite. Pero dos edificios con los mismos metros pueden valer muy distinto. La diferencia la hacen decisiones que ningún cálculo automático toma:</p>
+<ul><li><b>Cuánto se vende de lo que se construye.</b> Una planta bien resuelta vende más metros y desperdicia menos en pasillos.</li>
+<li><b>Luz y ventilación.</b> Cada apartamento necesita ventanas, y la norma exige patios de cierto tamaño si dan hacia ellos.</li>
+<li><b>El sótano.</b> Rampas, maniobras y columnas deciden cuántos parqueos caben de verdad.</li>
+<li><b>Vistas y vecinos.</b> Cómo se ubica el edificio define qué ve cada apartamento y a quién le quita el sol.</li>
+<li><b>Todo lo que este modelo no revisa.</b> Distancias del Código Civil, altura aeronáutica, conjuntos históricos y el trámite ante la Municipalidad.</li></ul>
+<p><b>Mismos metros, tres edificios:</b></p>
+<table><thead><tr><th>Forma</th><th>A favor</th><th>En contra</th></tr></thead><tbody>
+<tr><td>Bloque compacto</td><td>Construcción sencilla y económica</td><td>Apartamentos del centro con poca luz; casi sin área libre</td></tr>
+<tr><td>Con patio central</td><td>Luz y ventilación para todos; un jardín común</td><td>Necesita más pisos para los mismos metros</td></tr>
+<tr><td>Torre sobre basamento</td><td>Vistas, más terreno libre, menos impacto en los vecinos</td><td>Estructura y elevadores más caros</td></tr></tbody></table>
+<p><b>Convertir esta caja en un buen proyecto es el trabajo de un arquitecto.</b> Antes de comprar, vender o diseñar, consultá con un profesional colegiado: puede ser la diferencia entre un terreno que vale lo mínimo y uno que vale lo que realmente puede dar.</p>`);
+$('#btn-supuestos').onclick = () => modal(`<h2>Supuestos</h2>
+<p>Orientación, no un proyecto ni un avalúo. Reglas del POT (COM-030-08 y reformas). Verificá tu caso con la Dirección de Control Territorial.</p>
+<ul><li>Pisos de ${S.hPiso} m. El edificio ocupa el ${Math.round(S.huella*100)}% de lo construible y el sótano todo lo permitido.</li>
+<li>El área permeable se dibuja como una franja alrededor del predio. El terreno se dibuja plano.</li>
+<li>Apartamentos de 80 m² con 20% de circulación; parqueos de 30 m² incluyendo rampas; sótano a US$700/m².</li>
+<li>Precios de venta y costos: los de la Calculadora POT (Lab 1 UMBRAL 2025).</li>
+<li><b>Escenario máximo:</b> valores del reglamento de incentivos de 2024 pendientes de confirmar con el texto oficial.</li>
+<li><b>No incluido:</b> altura aeronáutica, conjuntos históricos, planes locales y distancias del Código Civil. Pueden ser más estrictos que la zona G.</li></ul>
+<p>${S.fuente}</p>`);
+
+// ─── Recorrido guiado (6 pasos) ───
+const PASOS = [
+  {t:'Este es tu terreno', p:() => `${fmt(S.A)} m² en zona ${S.zonaG}. El color indica qué tan denso puede ser lo que se construya aquí.`, a:() => { S.n=0; S.show.fant=false; }, f:null},
+  {t:'Esto es lo máximo que permite la norma', p:() => { const g=M.POT[S.zonaG]; return `La caja punteada es el volumen más grande que la Municipalidad permite aquí sin trámites especiales: ${fmt(g.ie*S.A)} m² y hasta ${g.alt} m de altura.`; }, a:() => { S.esc='base'; S.n=0; S.show.fant=true; }, f:null},
+  {t:'Construí piso por piso', p:() => 'Tocá + para agregar niveles. Mirá cómo se van usando los metros permitidos.', a:() => { S.n=1; }, f:'#stepper'},
+  {t:'Los parqueos van abajo', p:() => 'Cada apartamento necesita parqueos, y en esta zona van en sótanos. Son el costo que más pesa en el proyecto.', a:() => { S.n=999; S.show.sot=true; }, f:'#b-parq'},
+  {t:'Con incentivos se puede más', p:() => 'La Municipalidad permite construir más si el proyecto cumple ciertas obligaciones. Cambiá de escenario para verlo.', a:() => { S.esc='ampliado'; S.n=999; }, f:'#b-esc'},
+  {t:'La caja no es el edificio', p:() => 'Este modelo muestra lo que la norma permite, no el mejor proyecto. Cómo convertir esta caja en un buen edificio es trabajo de un arquitecto.', a:() => { S.esc='base'; S.n=999; }, f:'#btn-cierre'}
+];
+let paso = -1;
+function irPaso(i){
+  $$('.foco').forEach(e => e.classList.remove('foco'));
+  if(i < 0 || i >= PASOS.length){ paso=-1; $('#tour').style.display='none'; $('#velo').style.display='none'; S.show.fant=true; S.show.sot=true; S.esc='base'; S.n=999; S.visto={};
+    $$('[data-show]').forEach(b => { b.classList.toggle('on', S.show[b.dataset.show]); });
+    try{ localStorage.setItem('umbral3d_tour','1'); }catch(e){}
+    S.silencio = true; actualizar(); S.silencio = false; return; }
+  paso = i; const P = PASOS[i]; P.a(); S.visto = {primer:true, base:true, sup:true, inc:true, max:true, nocierra:true}; S.silencio = true;
+  $$('[data-show]').forEach(b => { b.classList.toggle('on', S.show[b.dataset.show]); });
+  actualizar(); S.visto = {}; S.silencio = false;
+  $('#tour-n').textContent = 'Paso ' + (i+1) + ' de ' + PASOS.length;
+  $('#tour-pasos').innerHTML = PASOS.map((_,k) => `<i class="${k<=i?'on':''}"></i>`).join('');
+  $('#tour-t').textContent = P.t; $('#tour-p').textContent = P.p();
+  $('#tour-atras').disabled = i===0; $('#tour-sig').textContent = i===PASOS.length-1 ? 'Terminar' : 'Siguiente';
+  $('#tour').style.display='flex'; $('#velo').style.display='block';
+  if(P.f) $(P.f).classList.add('foco');
+}
+$('#tour-sig').onclick = () => irPaso(paso+1);
+$('#tour-atras').onclick = () => irPaso(paso-1);
+$('#tour-saltar').onclick = () => irPaso(-1);
+$('#btn-tour').onclick = () => irPaso(0);
+
+// ─── Inicio ───
+(async function(){
+  await cargarPredio();
+  if(!M.POT[S.zonaG]){ S.vol={niveles:[],inf:S.paths,sup:[],aInf:0}; S.lim={ie:0,alt:0}; construirEscena(); panel(); ajustarCamara(); avisosIniciales(); return; }
+  S.n = 999; calcular(); S.prevSot = S.ev ? S.ev.sot.niveles : 0;
+  actualizar(); ajustarCamara(); ponerVista('axo'); avisosIniciales();
+  let visto = false; try{ visto = !!localStorage.getItem('umbral3d_tour'); }catch(e){}
+  if(!visto) setTimeout(() => irPaso(0), 600);
+})();
+})();
 </script>
 </body>
 </html>
