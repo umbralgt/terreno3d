@@ -231,6 +231,12 @@ table.niveles td{padding:5px 4px;border-top:1px solid var(--g300);font-variant-n
         <div class="barra" id="barra"></div>
         <div class="fila-b" id="barra-lbl"></div>
       </div>
+      <div class="bloque" id="b-forma">
+        <span class="mini-t">Forma del edificio</span>
+        <div class="seg" role="group" aria-label="Forma del edificio">
+          <button data-forma="bloque" class="sel">Bloque</button><button data-forma="torre">Basamento + torre</button>
+        </div>
+      </div>
       <div class="bloque" id="b-parq">
         <span class="mini-t">Parqueos por apartamento</span>
         <div class="seg" role="group" aria-label="Parqueos por apartamento">
@@ -240,6 +246,8 @@ table.niveles td{padding:5px 4px;border-top:1px solid var(--g300);font-variant-n
       <div class="tec grid campos">
         <div class="campo"><label for="h-piso">Altura piso a piso (m)</label><input id="h-piso" type="number" min="2.6" max="6" step="0.1" value="3"></div>
         <div class="campo"><label for="huella"><span class="g" data-g="huella">Huella</span> por nivel (%)</label><input id="huella" type="number" min="30" max="100" step="5" value="90"></div>
+        <div class="campo solo-torre"><label for="n-base">Niveles de basamento</label><input id="n-base" type="number" min="1" max="6" step="1" value="2"></div>
+        <div class="campo solo-torre"><label for="torre-pct">Planta de torre (% del retiro)</label><input id="torre-pct" type="number" min="10" max="100" step="5" placeholder="Auto"></div>
       </div>
       <div class="cifras" id="cifras"></div>
       <div class="tec" style="flex-direction:column;gap:6px">
@@ -261,7 +269,7 @@ table.niveles td{padding:5px 4px;border-top:1px solid var(--g300);font-variant-n
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineMaterial.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegments2.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/clipper-lib@6.4.2/clipper.js"></script>
-<script>/* pot-motor.js · v1.0 · UMBRAL Lab 2 · motor compartido Calculadora POT + Modelo 3D
+<script>/* pot-motor.js · v1.1 (basamento + torre) · UMBRAL Lab 2 · motor compartido Calculadora POT + Modelo 3D
    Reglas: Ficha normativa POT (COM-030-08 con reformas; COM-48-2024 por verificar). */
 (function(root){
 // V14: parámetros verificados contra el reglamento POT (arts. 42-47, 47 Bis). Ver Ficha normativa POT.
@@ -466,6 +474,45 @@ function lonLatAMetros(ring){
   return {ring: ring.map(([x,y])=>[(x-cx)*kx,(y-cy)*ky]), centro:[cx,cy]};
 }
 
+// ==================== TORRE RECTANGULAR (v1.1) ====================
+// Centroide de área de un anillo
+function centroArea(r){ let a=0,cx=0,cy=0; for(let i=0,j=r.length-1;i<r.length;j=i++){ const f=r[j][0]*r[i][1]-r[i][0]*r[j][1]; a+=f; cx+=(r[j][0]+r[i][0])*f; cy+=(r[j][1]+r[i][1])*f; } a*=0.5; return Math.abs(a)<1e-9 ? r[0] : [cx/(6*a), cy/(6*a)]; }
+// Orientación y medidas del rectángulo mínimo que encierra un anillo
+function rectMinimo(r){ let best={ar:Infinity};
+  for(let i=0;i<r.length;i++){ const [ax,ay]=r[i],[bx,by]=r[(i+1)%r.length], ang=Math.atan2(by-ay,bx-ax), c=Math.cos(-ang), s=Math.sin(-ang);
+    let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity; r.forEach(([x,y])=>{ const u=x*c-y*s, v=x*s+y*c; x0=Math.min(x0,u);x1=Math.max(x1,u);y0=Math.min(y0,v);y1=Math.max(y1,v); });
+    const ar=(x1-x0)*(y1-y0); if(ar<best.ar) best={ar, ang, w:x1-x0, l:y1-y0}; }
+  return best; }
+// Rectángulo de área = pct × área del retiro, orientado como el terreno y siempre dentro del retiro.
+// Prueba varios centros y ambas orientaciones, y se queda con el que logra más área (sirve en formas irregulares).
+// Por defecto la torre busca al menos ~400 m² (una planta de torre realista), si el retiro lo permite.
+function torreRect(env, pct){
+  const ring = env.reduce((a,b)=>areaAbs([b])>areaAbs([a])?b:a, env[0]);
+  if(!ring) return null;
+  const aEnv=areaAbs([ring]); if(aEnv < 1) return null;
+  const rm=rectMinimo(ring), cA=centroArea(ring);
+  const objetivo = pct==null ? Math.min(aEnv, Math.max(0.5*aEnv, 400)) : pct*aEnv;
+  const k=Math.min(2.5, Math.max(1, Math.max(rm.w,rm.l)/Math.max(1e-6,Math.min(rm.w,rm.l))));
+  const armar=(cx,cy,T,rot)=>{ const a=Math.sqrt(T/k), b=a*k, u=(rm.w>=rm.l)!==rot?b:a, v=(rm.w>=rm.l)!==rot?a:b, c=Math.cos(rm.ang), s=Math.sin(rm.ang);
+    return [[-u/2,-v/2],[u/2,-v/2],[u/2,v/2],[-u/2,v/2]].map(([x,y])=>[cx+x*c-y*s, cy+x*s+y*c]); };
+  const cabe=r=>areaAbs(interseccion([r],[ring])) >= areaAbs([r])*0.995;
+  // Centros candidatos: centroide y una grilla dentro del retiro
+  const xs=ring.map(p=>p[0]), ys=ring.map(p=>p[1]), x0=Math.min(...xs), x1=Math.max(...xs), y0=Math.min(...ys), y1=Math.max(...ys);
+  const cand=[cA]; const N=6;
+  for(let i=1;i<N;i++) for(let j=1;j<N;j++) cand.push([x0+(x1-x0)*i/N, y0+(y1-y0)*j/N]);
+  let mejor=null;
+  for(const [cx,cy] of cand){
+    for(const rot of [false,true]){
+      if(mejor && mejor.area >= objetivo*0.999) break;
+      let lo=0, hi=objetivo;              // búsqueda del área máxima que cabe con este centro
+      if(!cabe(armar(cx,cy,Math.max(1,hi*0.02),rot))) continue;
+      if(cabe(armar(cx,cy,hi,rot))) lo=hi; else for(let t=0;t<12;t++){ const m=(lo+hi)/2; cabe(armar(cx,cy,m,rot)) ? lo=m : hi=m; }
+      if(!mejor || lo > mejor.area) mejor={ring:armar(cx,cy,lo,rot), area:lo, ajustado: lo < objetivo*0.999};
+    }
+  }
+  return mejor && mejor.area >= 1 ? mejor : null;
+}
+
 // ==================== VOLUMETRÍA PISO POR PISO ====================
 // Escenarios: 'base' | 'ampliado' | 'maximo' (maximo solo G4/G5, valores COM-48-2024 por verificar)
 function limitesEscenario(zonaG, esc){
@@ -489,12 +536,18 @@ function volumetria(op){
   // Huella del bloque superior: retirada sepBS de TODOS los linderos (incluida la calle) y dentro de la inferior
   const sup = interseccion(insetPaths(op.paths, g.sepBS), inf);
   const aInf=areaAbs(inf), aSup=areaAbs(sup), m2Lim=lim.ie*A;
+  // Forma "torre": basamento de nBase niveles con la huella completa; encima, una torre rectangular dentro del retiro
+  const esTorre = op.forma==='torre';
+  const nBase = esTorre ? Math.max(1, op.nBase||2) : 0;
+  const torre = esTorre ? torreRect(sup.length ? sup : inf, op.torrePct) : null;
+  const aTorre = torre ? torre.area : 0;
   const niveles=[]; let acum=0, motivo=null, i=0;
   while(i<200){
     i++; const z0=(i-1)*h, z1=i*h;
     if(z1 > lim.alt + 1e-6){ motivo='altura'; break; }
     const bloque = z1 <= g.bs + 1e-6 ? 'inferior' : 'superior';
-    let area = bloque==='inferior' ? aInf : aSup;
+    const parte = !esTorre ? null : (i <= nBase && bloque==='inferior') ? 'basamento' : 'torre';
+    let area = parte==='torre' ? aTorre : parte==='basamento' ? aInf : (bloque==='inferior' ? aInf : aSup);
     if(area < 1){ motivo='retiro'; break; }
     const resta = m2Lim - acum;
     if(resta <= 1){ motivo='indice'; break; }
@@ -502,11 +555,11 @@ function volumetria(op){
     if(area > resta && resta < area*0.25){ motivo='indice'; break; }
     let parcial=false; if(area > resta){ area=resta; parcial=true; }
     acum += area;
-    niveles.push({n:i, z0, z1, bloque, area, acum, parcial, pisosNorma: h>4?Math.ceil(h/4):1, cat:categoriaNivel(g, acum, A, z1)});
+    niveles.push({n:i, z0, z1, bloque, parte, area, acum, parcial, pisosNorma: h>4?Math.ceil(h/4):1, cat:categoriaNivel(g, acum, A, z1)});
     if(parcial){ motivo='indice'; break; }
   }
   const alt = niveles.length ? niveles[niveles.length-1].z1 : 0;
-  return {A, lim, aInf, aSup, inf, sup, niveles, m2:acum, alt, pctIE: acum/(g.ie*A), motivo,
+  return {A, lim, aInf, aSup, inf, sup, torre, aTorre, esTorre, nBase, niveles, m2:acum, alt, pctIE: acum/(g.ie*A), motivo,
           m2Base:g.ie*A, m2Amp:g.ie_a*A, m2Max:g.ie_max?g.ie_max*A:null};
 }
 
@@ -530,7 +583,7 @@ function evaluarVolumetria(v, op){
 
 const API={POT, LAB1_VENTA, paramsEscenario, visitasNorma, estacionamientos, calcSotanoV10, costosProyecto,
   programaAuto, evaluarProyecto, valorResidual, areaAbs, insetPaths, interseccion, insetHastaArea, lonLatAMetros,
-  limitesEscenario, volumetria, evaluarVolumetria};
+  limitesEscenario, volumetria, evaluarVolumetria, torreRect};
 if(typeof module!=='undefined' && module.exports) module.exports=API; else root.POTMotor=API;
 })(typeof window!=='undefined'?window:globalThis);
 </script>
@@ -551,7 +604,7 @@ const tint = (hex,t) => new THREE.Color(hex).lerp(new THREE.Color(0xffffff), 1-t
 // ─── Estado ───
 const S = window.__S3D = {
   zonaG:'G4', zp:null, A:0, paths:null, vecinos:[], ancho:null, largo:null, ncm:null, demo:false, fuente:'',
-  esc:'base', n:0, pu:1, modo:'simple', hPiso:3, huella:0.9,
+  esc:'base', n:0, pu:1, modo:'simple', hPiso:3, huella:0.9, forma:'bloque', nBase:2, torrePct:null,
   show:{etq:true, fant:true, sot:true, vec:true, amb:true}, vista:'axo',
   vol:null, sub:[], ev:null, visto:{}, prevSot:0, prevValor:null
 };
@@ -637,7 +690,7 @@ function minRect(ring){
 // ─── Cálculo ───
 function calcular(){
   const g = M.POT[S.zonaG];
-  S.vol = M.volumetria({paths:S.paths, zonaG:S.zonaG, esc:S.esc, hPiso:S.hPiso, huellaPct:S.huella});
+  S.vol = M.volumetria({paths:S.paths, zonaG:S.zonaG, esc:S.esc, hPiso:S.hPiso, huellaPct:S.huella, forma:S.forma, nBase:S.nBase, torrePct:S.torrePct});
   S.n = Math.max(0, Math.min(S.n, S.vol.niveles.length));
   S.sub = S.vol.niveles.slice(0, S.n);
   const m2 = S.sub.length ? S.sub[S.sub.length-1].acum : 0;
@@ -691,10 +744,10 @@ function construirEscena(){
   const rInf = mayor(S.vol.inf), rSup = S.vol.sup.length ? mayor(S.vol.sup) : null;
   // Edificio agrupado por bloque y categoría
   const grupos = [];
-  S.sub.forEach(n => { const k = n.bloque + (n.cat==='base'?'b':'i'); const u = grupos[grupos.length-1];
-    if(u && u.k===k){ u.z1=n.z1; u.n.push(n); } else grupos.push({k, z0:n.z0, z1:n.z1, n:[n], bloque:n.bloque, inc:n.cat!=='base'}); });
+  S.sub.forEach(n => { const k = (n.parte||'') + n.bloque + (n.cat==='base'?'b':'i'); const u = grupos[grupos.length-1];
+    if(u && u.k===k){ u.z1=n.z1; u.n.push(n); } else grupos.push({k, z0:n.z0, z1:n.z1, n:[n], bloque:n.bloque, parte:n.parte, inc:n.cat!=='base'}); });
   grupos.forEach(G => {
-    const ring = G.bloque==='inferior' ? rInf : rSup; if(!ring) return;
+    const ring = G.parte==='torre' ? (S.vol.torre && S.vol.torre.ring) : (G.parte==='basamento' || G.bloque==='inferior') ? rInf : rSup; if(!ring) return;
     const parcial = G.n[G.n.length-1].parcial;
     prisma(dyn, ring, G.z0+0.04, G.z1-G.z0-0.08, G.inc ? tint(AZUL,.20) : tint(zc,.20), G.inc ? AZUL : 0x0a0a0a, simple?2:1.6, 1);
     G.n.slice(1).forEach(n => {
@@ -793,7 +846,8 @@ function etiquetas(){
   const tags = $('#tags'), svg = $('#guias'); tags.innerHTML=''; svg.innerHTML='';
   if(!S.show.etq || !M.POT[S.zonaG]) return;
   const w = vista.clientWidth, h = vista.clientHeight, g = M.POT[S.zonaG], simple = S.modo==='simple';
-  const bP = bbox(S.paths[0]), rSup = S.vol.sup.length ? mayor(S.vol.sup) : S.paths[0], bS = bbox(rSup);
+  const esT = S.forma==='torre' && S.vol.torre;
+  const bP = bbox(S.paths[0]), rSup = esT ? S.vol.torre.ring : (S.vol.sup.length ? mayor(S.vol.sup) : S.paths[0]), bS = bbox(rSup);
   const cx = (bP.x0+bP.x1)/2, cz = (bP.z0+bP.z1)/2, L = [];
   const zonaTxt = 'zona ' + S.zonaG;
   // Vértice del predio más cercano a la cámara (sirve también en formas irregulares)
@@ -801,10 +855,11 @@ function etiquetas(){
   L.push([simple ? 'Tu terreno · ' + zonaTxt : S.zonaG + ' · ' + fmt(S.A) + ' m²', [vx[0]*0.92, 0, -vx[1]*0.92], 150, 40]);
   if(S.n){
     const base = S.sub.filter(n=>n.cat==='base'), inc = S.sub.filter(n=>n.cat!=='base');
-    if(base.length) L.push([simple ? 'Pisos sin trámites especiales' : 'Base · ' + base.length + ' niveles', [cx-8, Math.min(base[base.length-1].z1, g.bs)/2, bP.z1-3], -300, -20]);
+    if(base.length) L.push([esT ? (simple ? 'Basamento · pegado a los vecinos' : 'Basamento · ' + S.vol.nBase + ' niveles') : simple ? 'Pisos sin trámites especiales' : 'Base · ' + base.length + ' niveles', [cx-8, Math.min(base[base.length-1].z1, g.bs)/2, bP.z1-3], -300, -20]);
     if(inc.length) L.push([simple ? 'Pisos que necesitan incentivos' : 'Con incentivos · ' + inc.length + ' niveles', [bP.x1, (inc[0].z0+inc[inc.length-1].z1)/2, cz+8], 200, -40, 'acc']);
     L.push([S.alt + ' m de altura', [bS.x1, S.alt, bS.z0+6], 180, -50, 'neg']);
-    if(!simple && S.sub.some(n=>n.bloque==='superior')) L.push(['Bloque superior · retiro ' + g.sepBS + ' m', [bS.x0, S.alt-1.5, (bS.z0+bS.z1)/2], -210, 45]);
+    if(esT && S.sub.some(n=>n.parte==='torre')) L.push([simple ? 'Torre · separada de los vecinos' : 'Torre · ' + fmt(S.vol.aTorre) + ' m² por planta', [bS.x0, S.alt*0.55, (bS.z0+bS.z1)/2], -250, 40]);
+    if(!esT && !simple && S.sub.some(n=>n.bloque==='superior')) L.push(['Bloque superior · retiro ' + g.sepBS + ' m', [bS.x0, S.alt-1.5, (bS.z0+bS.z1)/2], -210, 45]);
   }
   if(S.show.sot && S.ev && S.ev.sot.niveles) L.push([S.ev.sot.niveles + (simple ? ' sótanos de parqueo' : ' sótanos · ' + S.ev.est.total + ' parqueos'), [0, -S.ev.sot.niveles*1.5, 0], -120, 110]);
   if(S.show.fant) L.push([simple ? (w < 560 ? 'Permitido · hasta ' : 'Espacio que aún permite la norma · hasta ') + S.lim.alt + ' m' : 'Máximo del escenario · ' + S.lim.alt + ' m', [bS.x0, Math.max(S.alt, S.lim.alt*0.8), bS.z1], -170, -40]);
@@ -829,6 +884,9 @@ function panel(){
   $$('[data-esc]').forEach(b => { const noMax = b.dataset.esc==='maximo' && !(g && g.ie_max); b.disabled = noMax; b.classList.toggle('sel', b.dataset.esc===S.esc); });
   $$('[data-pu]').forEach(b => b.classList.toggle('sel', +b.dataset.pu===S.pu));
   $$('[data-modo]').forEach(b => b.classList.toggle('sel', b.dataset.modo===S.modo));
+  $$('[data-forma]').forEach(b => b.classList.toggle('sel', b.dataset.forma===S.forma));
+  $$('.solo-torre').forEach(el => el.style.opacity = S.forma==='torre' ? '1' : '.4');
+  $$('.solo-torre input').forEach(el => el.disabled = S.forma!=='torre');
   document.body.classList.toggle('tecnico', !simple);
   const mas = $('#mas'); mas.disabled = !g || S.n >= S.vol.niveles.length; $('#menos').disabled = S.n <= 0; $('#llenar').disabled = mas.disabled;
   $('#niv b').textContent = 'Nivel ' + S.n; $('#niv span').textContent = S.alt + ' m de ' + (S.lim ? S.lim.alt : 0) + ' m';
@@ -858,7 +916,7 @@ function panel(){
   h += `<div class="cif full"><b>${valor}</b><span><span class="g" data-g="valor">Lo máximo que un desarrollador podría pagar</span>${proc ? ' · aprobación: ' + proc : ''}</span></div>`;
   $('#cifras').innerHTML = h;
   // Tabla por nivel
-  const filas = S.sub.slice().reverse().map(n => `<tr><td>${n.n}</td><td>${n.bloque==='inferior'?'Inferior':'Superior'}</td><td>${fmt(n.area)}</td><td>${fmt(n.acum)}</td><td>${n.cat==='base'?'Base':n.cat==='ampliado'?'Ampl.':'Máx.*'}</td></tr>`).join('');
+  const filas = S.sub.slice().reverse().map(n => `<tr><td>${n.n}</td><td>${n.parte ? (n.parte==='torre'?'Torre':'Basamento') : (n.bloque==='inferior'?'Inferior':'Superior')}</td><td>${fmt(n.area)}</td><td>${fmt(n.acum)}</td><td>${n.cat==='base'?'Base':n.cat==='ampliado'?'Ampl.':'Máx.*'}</td></tr>`).join('');
   $('#tabla').innerHTML = `<thead><tr><th>Nivel</th><th>Bloque</th><th>m²</th><th>Acum.</th><th>Escen.</th></tr></thead><tbody>${filas || '<tr><td colspan="5">Agregá niveles con +</td></tr>'}</tbody>`;
   // Enlace a la calculadora
   const qp = new URLSearchParams({zona:S.zonaG, area:Math.round(S.A), ancho:Math.round(S.ancho), largo:Math.round(S.largo)});
@@ -932,6 +990,21 @@ $$('[data-pu]').forEach(b => b.onclick = () => {
   if(S.n && S.pv && antes != null) decir(S.modo==='simple' ? `Con ${S.pu} parqueo${S.pu>1?'s':''} por apartamento, el valor del terreno pasa de ${(antes/1e6).toFixed(1)} a ${(S.ev.valor/1e6).toFixed(1)} millones de dólares.` : `Plazas: ${S.ev.est.total} (mínimo municipal: ${S.ev.est.norma}). Sótanos: ${S.ev.sot.niveles}.`);
 });
 $$('[data-modo]').forEach(b => b.onclick = () => { S.modo = b.dataset.modo; actualizar(); });
+$$('[data-forma]').forEach(b => b.onclick = () => {
+  S.forma = b.dataset.forma; const a = S.n; S.n = 999; actualizar(); ajustarCamara();
+  if(S.forma !== 'torre') return;
+  const t = S.vol.torre, simple = S.modo==='simple';
+  if(!t) return decir(simple ? 'Con la separación que exige la norma, en este terreno no cabe una torre.' : 'No cabe un rectángulo de torre dentro del retiro del bloque superior.');
+  if(S.vol.aTorre < 150) return decir(simple ? 'Este terreno es muy pequeño para una torre: la planta quedaría de apenas ' + fmt(S.vol.aTorre) + ' m².' : 'Planta de torre de ' + fmt(S.vol.aTorre) + ' m²: poco eficiente para núcleo de circulación y apartamentos.');
+  const resto = S.lim.ie*S.A - S.m2;
+  if(S.vol.motivo==='altura' && resto > 25) return decir(simple
+    ? 'La torre llega a la altura máxima antes de usar todos los metros: quedan ' + fmt(resto) + ' m² sin construir. Con una torre más ancha o más niveles de basamento se aprovechan.'
+    : 'Límite de altura (' + S.lim.alt + ' m) con ' + fmt(resto) + ' m² de índice sin usar. Aumentá la planta de la torre o los niveles de basamento.');
+  decir(simple ? 'Mismos metros, otra forma: la torre libera el terreno de arriba, gana vistas y afecta menos a los vecinos. Cuesta más construirla (estructura y elevadores), y este modelo no lo calcula.'
+               : 'Basamento de ' + S.vol.nBase + ' niveles con huella completa y torre de ' + fmt(S.vol.aTorre) + ' m² por planta dentro del retiro de ' + M.POT[S.zonaG].sepBS + ' m. El costo adicional de estructura y elevadores no está incluido en el valor.');
+});
+$('#n-base').onchange = e => { const g=M.POT[S.zonaG], mx = g ? Math.max(1, Math.floor(g.bs/S.hPiso)) : 5; S.nBase = Math.min(mx, Math.max(1, parseInt(e.target.value,10)||2)); e.target.value = S.nBase; S.n=999; actualizar(); ajustarCamara(); };
+$('#torre-pct').onchange = e => { const v = parseFloat(e.target.value); S.torrePct = (v>=10 && v<=100) ? v/100 : null; if(S.torrePct===null) e.target.value=''; S.n=999; actualizar(); ajustarCamara(); };
 $$('[data-show]').forEach(b => b.onclick = () => { const k=b.dataset.show; S.show[k] = !S.show[k]; b.classList.toggle('on', S.show[k]); b.setAttribute('aria-pressed', S.show[k]); construirEscena(); });
 $$('[data-vista]').forEach(b => b.onclick = () => ponerVista(b.dataset.vista));
 $('#h-piso').onchange = e => { S.hPiso = Math.min(6, Math.max(2.6, parseFloat(e.target.value)||3)); e.target.value = S.hPiso; actualizar(); ajustarCamara();
