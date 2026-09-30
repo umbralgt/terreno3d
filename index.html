@@ -261,7 +261,7 @@ table.niveles td{padding:5px 4px;border-top:1px solid var(--g300);font-variant-n
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineMaterial.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegments2.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/clipper-lib@6.4.2/clipper.js"></script>
-<script>/* pot-motor.js · UMBRAL Lab 2 · motor compartido Calculadora POT + Modelo 3D
+<script>/* pot-motor.js · v1.0 · UMBRAL Lab 2 · motor compartido Calculadora POT + Modelo 3D
    Reglas: Ficha normativa POT (COM-030-08 con reformas; COM-48-2024 por verificar). */
 (function(root){
 // V14: parámetros verificados contra el reglamento POT (arts. 42-47, 47 Bis). Ver Ficha normativa POT.
@@ -410,7 +410,7 @@ function evaluarProyecto(o){
   const huellaMax = o.area*(1-g.perm);
   const huella = m2T/nMax;
   const est = estacionamientos({zonaG:o.zonaG, nu:o.nu, m2R, am:o.am, plazasU:o.plazasU, visitas:o.visitas});
-  const sot = calcSotanoV10({area:o.area, perm:g.perm, huella:Math.min(huella,huellaMax),
+  const sot = calcSotanoV10({area:o.area, perm:g.perm, huella:huellaMax*0.9, // V15: misma huella del edificio que el modelo 3D (90% de lo construible)
     plazas:est.total, m2Plaza:o.m2Plaza, ancho:o.ancho, largo:o.largo,
     nivDecl:o.nivDecl||0, areaDecl:o.areaDecl||0,
     permiteSup: o.zonaG==='G1'||o.zonaG==='G2'||o.zonaG==='G3'});
@@ -519,7 +519,8 @@ function evaluarVolumetria(v, op){
   const sot=calcSotanoV10({area:v.A, perm:g.perm, huella:v.aInf, plazas:est.total, m2Plaza,
     ancho:0, largo:0, nivDecl:0, areaDecl:0, permiteSup: op.zonaG==='G1'||op.zonaG==='G2'||op.zonaG==='G3'});
   const ventas = pv ? m2R*pv : 0;
-  const C = costosProyecto({zonaG:op.zonaG, area:v.A, m2T:v.m2, cm2:op.cm2||580, di:5.5, ad:5.5, ins:13,
+  const C = costosProyecto({zonaG:op.zonaG, area:v.A, m2T:m2R*1.2, // V15: costo según los apartamentos, igual que la calculadora
+    cm2:op.cm2||580, di:5.5, ad:5.5, ins:13,
     sot, cSot:op.cSot||700, esMax: op.esc==='ampliado'||op.esc==='maximo', dev:op.dev||DEV_ESTANDAR, ventas}); // caución 5% sobre lo obtenido por incentivos (COM-48-2024)
   const valor = pv ? valorResidual(ventas, C.total, op.margen||25) : null;
   // Procedimiento según el nivel más exigente alcanzado
@@ -615,6 +616,10 @@ async function cargarPredio(){
     S.fuente = 'Ejemplo con un predio de zona 10. Abrí esta herramienta desde el Mapa POT para ver tu terreno.';
   }
   S.A = M.areaAbs(S.paths);
+  // V15: parqueos y escenario que manda la calculadora
+  const pu = parseInt(q.get('pu'),10); if([1,2,3].includes(pu)) S.pu = pu;
+  const esc = q.get('esc'); const gz = M.POT[S.zonaG];
+  if(['base','ampliado','maximo'].includes(esc)) S.esc = (esc==='maximo' && !(gz && gz.ie_max)) ? 'ampliado' : esc;
   if(!S.ancho){ const r = minRect(S.paths[0]); S.ancho = r[0]; S.largo = r[1]; }
 }
 // Rectángulo mínimo aproximado: orientado según cada lado del polígono
