@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa POT — ( UMBRAL ) Lab 2</title>
+<script src="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/pmtiles@3.2.0/dist/pmtiles.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  display: flex; flex-direction: column; height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Nav ────────────────────────────────────────────────────── */
+#header {
+  background: #fff;
+  border-bottom: 1.5px solid #0a0a0a;
+  padding: 0 20px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  z-index: 2000;
+  gap: 16px;
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none; color: #0a0a0a;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.02em;
+  white-space: nowrap; flex-shrink: 0;
+  padding-right: 16px; border-right: 1px solid #e8e8e8; height: 100%;
+}
+.nav-links {
+  display: flex; align-items: center; gap: 4px; flex: 1;
+  overflow-x: auto; scrollbar-width: none;
+}
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-link {
+  padding: 6px 12px; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: #888; border-radius: 6px; text-decoration: none;
+  white-space: nowrap; transition: all .15s;
+}
+.nav-link:hover { color: #0a0a0a; background: #f0f0f0; }
+.nav-link.active { color: #0a0a0a; background: #f0f0f0; }
+.nav-back {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 8px 16px; background: #0a0a0a; color: #fff;
+  font-size: 12px; font-weight: 500; border-radius: 8px;
+  text-decoration: none; white-space: nowrap; flex-shrink: 0;
+  transition: opacity .15s;
+}
+.nav-back:hover { opacity: 0.85; }
+
+/* ── Mapa ────────────────────────────────────────────────────── */
+#map { flex: 1; position: relative; }
+
+/* ── Leyenda ─────────────────────────────────────────────────── */
+#legend {
+  position: fixed; bottom: 28px; left: 16px;
+  background: #fff;
+  border: 1.5px solid #0a0a0a;
+  border-radius: 10px; padding: 12px 14px;
+  z-index: 1000; font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+#legend h3 {
+  font-size: 9px; font-weight: 700; color: #aaa;
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px;
+}
+.li {
+  display: flex; align-items: center; gap: 9px;
+  margin-bottom: 6px; color: #0a0a0a; cursor: pointer;
+  font-size: 11px; font-weight: 500;
+  user-select: none; transition: opacity .15s;
+}
+.li:last-child { margin-bottom: 0; }
+.li:hover { opacity: 0.7; }
+.dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; transition: opacity .2s; }
+.li.off .dot { opacity: 0.2; }
+.li.off { color: #bbb; }
+
+/* ── Panel de predio ─────────────────────────────────────────── */
+#panel {
+  position: fixed; top: 68px; right: 14px;
+  background: #fff;
+  border: 1.5px solid #0a0a0a;
+  border-radius: 10px; padding: 16px;
+  z-index: 1000; width: 248px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+#panel h3 {
+  font-size: 9px; font-weight: 700; color: #aaa;
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px;
+}
+.row {
+  display: flex; justify-content: space-between;
+  align-items: baseline; margin-bottom: 6px;
+  padding-bottom: 6px; border-bottom: 1px solid #f0f0f0;
+}
+.row:last-of-type { border-bottom: none; }
+.lbl { color: #888; font-size: 11px; font-weight: 500; }
+.val { font-weight: 600; color: #0a0a0a; font-size: 11px; text-align: right; max-width: 140px; }
+.badge {
+  display: inline-block; padding: 3px 10px;
+  border-radius: 6px; font-weight: 700; font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.metric {
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1.5px solid #0a0a0a;
+}
+.metric-label {
+  font-size: 9px; color: #aaa; text-transform: uppercase;
+  letter-spacing: 0.07em; margin-bottom: 4px; font-weight: 700;
+}
+.metric-value {
+  font-size: 24px; font-weight: 700; color: #0a0a0a;
+  letter-spacing: -0.02em; line-height: 1;
+}
+.metric-sub { font-size: 10px; color: #888; margin-top: 3px; font-weight: 500; }
+.hint { color: #aaa; font-size: 12px; line-height: 1.6; font-weight: 500; }
+
+/* Botón calcular */
+.btn-calcular {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 10px 14px;
+  background: #0a0a0a; color: #fff;
+  border: none; border-radius: 8px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  cursor: pointer; text-decoration: none;
+  margin-top: 12px; transition: opacity .15s;
+}
+.btn-calcular:hover { opacity: 0.85; }
+.btn-calcular-sub {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 8px 14px;
+  background: #fff; color: #0a0a0a;
+  border: 1.5px solid #0a0a0a; border-radius: 8px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  cursor: pointer; text-decoration: none;
+  margin-top: 6px; transition: background .15s;
+}
+.btn-calcular-sub:hover { background: #f0f0f0; }
+
+/* ── Controles del mapa ──────────────────────────────────────── */
+.maplibregl-ctrl-group {
+  border: 1.5px solid #0a0a0a !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.maplibregl-ctrl-group button {
+  background: #fff !important; color: #0a0a0a !important;
+}
+.maplibregl-ctrl-group button:hover { background: #f0f0f0 !important; }
+.maplibregl-ctrl-attrib { font-family: inherit; font-size: 9px; }
+.maplibregl-ctrl-attrib.maplibregl-compact { background: rgba(255,255,255,.85); }
+
+/* ── Zoom hint ───────────────────────────────────────────────── */
+#zoom-hint {
+  position: fixed; bottom: 28px; right: 14px;
+  background: #0a0a0a; color: #fff;
+  border-radius: 8px; padding: 7px 14px;
+  font-size: 11px; font-weight: 600; z-index: 1000;
+  display: none; letter-spacing: 0.03em;
+}
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<div id="header">
+  <a class="nav-logo" href="https://lab2.umbralgt.com">
+    ( U ) &nbsp; Lab 2 · Arquitectura
+  </a>
+  <div class="nav-links">
+    <a class="nav-link active" href="#">Mapa POT</a>
+    <a class="nav-link" href="https://calculadora-pot.umbralgt.com">Calculadora POT</a>
+    <a class="nav-link" href="https://entender-pot.umbralgt.com">Entender el POT</a>
+  </div>
+  <a class="nav-back" href="https://www.umbralgt.com" target="_blank" rel="noopener">
+    <span>←</span><span>umbralgt.com</span>
+  </a>
+</div>
+
+<div id="map"></div>
+
+<!-- Leyenda -->
+<div id="legend">
+  <h3>Zona G — POT</h3>
+  <div class="li" data-zona="G0"><div class="dot" style="background:#2d7a1f"></div>G0 · Sin edificar</div>
+  <div class="li" data-zona="G1"><div class="dot" style="background:#5aab2e"></div>G1 · Baja densidad</div>
+  <div class="li" data-zona="G2"><div class="dot" style="background:#c8d400"></div>G2 · Media-baja</div>
+  <div class="li" data-zona="G3"><div class="dot" style="background:#f5d800"></div>G3 · Media</div>
+  <div class="li" data-zona="G4"><div class="dot" style="background:#f59100"></div>G4 · Media-alta</div>
+  <div class="li" data-zona="G5"><div class="dot" style="background:#e02020"></div>G5 · Alta densidad</div>
+</div>
+
+<!-- Panel de predio -->
+<div id="panel">
+  <h3>Predio</h3>
+  <div class="hint">Hacé clic en un predio<br>para ver su ficha.</div>
+</div>
+
+<!-- Zoom hint -->
+<div id="zoom-hint">Acercate para ver predios individuales</div>
+
+<script>
+// V2: el archivo vive en el mismo repositorio de GitHub (ya no depende de Supabase, que pausa proyectos inactivos).
+// Incluye ancho, largo y regularidad de cada predio, calculados desde su forma completa.
+const PMTILES_URL = new URL('predios.pmtiles', window.location.href).href;
+
+// URL de la calculadora — ajustar cuando esté en producción
+const CALC_URL = 'https://calculadora-pot.umbralgt.com';
+
+const COLORS = {
+  G0:'#2d7a1f', G1:'#5aab2e', G2:'#c8d400',
+  G3:'#f5d800', G4:'#f59100', G5:'#e02020'
+};
+const TEXT_COLORS = {
+  G0:'#fff', G1:'#fff', G2:'#1a1a00',
+  G3:'#1a1a00', G4:'#fff', G5:'#fff'
+};
+const DESCS = {
+  G0:'Sin edificar / restricción',
+  G1:'Baja densidad',
+  G2:'Media-baja densidad',
+  G3:'Media densidad',
+  G4:'Media-alta densidad',
+  G5:'Alta densidad'
+};
+
+// IE máximo por zona (referencia POT)
+const IE_REF = { G0:0, G1:1.2, G2:1.8, G3:2.7, G4:4, G5:6 }; // IE base POT (igual que la calculadora)
+
+// Protocolo PMTiles
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol('pmtiles', protocol.tile);
+
+const map = new maplibregl.Map({
+  container: 'map',
+  // Mapa de fondo: OpenFreeMap Positron — gratuito, sin clave y sin límites.
+  // (CARTO empezó a exigir clave en 2026 y mostraba "API KEY REQUIRED".)
+  style: 'https://tiles.openfreemap.org/styles/positron',
+  attributionControl: false,
+  center: [-90.507, 14.621],
+  zoom: 13,
+  maxZoom: 18,
+  minZoom: 10
+});
+
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+
+// Filtros activos
+const activeZonas = new Set(['G0','G1','G2','G3','G4','G5']);
+
+function buildFilter() {
+  const active = [...activeZonas];
+  if (active.length === 6) return ['has', 'zona_g'];
+  if (active.length === 0) return ['==', 'zona_g', ''];
+  return ['in', ['get', 'zona_g'], ['literal', active]];
+}
+
+// Construir URL de la calculadora con parámetros del predio
+// Dirección de la herramienta "Mi terreno 3D" (cambiala si usás otro subdominio)
+const URL_3D = 'https://terreno3d.umbralgt.com';
+function build3DURL(p, g, feat) {
+  const geom = feat.geometry;
+  const ring = geom.type === 'Polygon' ? geom.coordinates[0] : geom.coordinates[0][0];
+  const cx = ring.reduce((s, q) => s + q[0], 0) / ring.length;
+  const cy = ring.reduce((s, q) => s + q[1], 0) / ring.length;
+  const params = new URLSearchParams();
+  if (p.ncm) params.set('ncm', p.ncm);
+  params.set('c', cx.toFixed(6) + ',' + cy.toFixed(6));
+  if (g) params.set('zona', g);
+  if (p.area_m2) params.set('area', Math.round(p.area_m2));
+  if (p.zona) params.set('zona_postal', p.zona);
+  if (p.ancho && p.largo) { params.set('ancho', p.ancho); params.set('largo', p.largo); }
+  return URL_3D + '?' + params.toString();
+}
+
+function buildCalcURL(p, g) {
+  const params = new URLSearchParams();
+  if (g)         params.set('zona', g);
+  if (p.area_m2) params.set('area', Math.round(p.area_m2));
+  if (p.ie_max)  params.set('ie', p.ie_max);
+  if (p.alt_perm) params.set('alt', p.alt_perm);
+  if (p.zona)    params.set('zona_postal', p.zona);
+  if (p.ancho && p.largo) { params.set('ancho', p.ancho); params.set('largo', p.largo); }
+  return `${CALC_URL}?${params.toString()}`;
+}
+
+map.on('load', () => {
+  // Los predios se dibujan debajo de las etiquetas (nombres de calles y colonias)
+  const primeraEtiqueta = (map.getStyle().layers.find(l => l.type === 'symbol') || {}).id;
+
+  map.addSource('predios', {
+    type: 'vector',
+    url: 'pmtiles://' + PMTILES_URL
+  });
+
+  map.addLayer({
+    id: 'predios-fill',
+    type: 'fill',
+    source: 'predios',
+    'source-layer': 'predios',
+    paint: {
+      'fill-color': [
+        'match', ['get', 'zona_g'],
+        'G0','#2d7a1f','G1','#5aab2e','G2','#c8d400',
+        'G3','#f5d800','G4','#f59100','G5','#e02020','#cccccc'
+      ],
+      'fill-opacity': ['interpolate',['linear'],['zoom'], 10,0.75, 16,0.55]
+    }
+  }, primeraEtiqueta);
+
+  map.addLayer({
+    id: 'predios-line',
+    type: 'line',
+    source: 'predios',
+    'source-layer': 'predios',
+    minzoom: 14,
+    paint: { 'line-color':'#fff','line-width':0.6,'line-opacity':0.5 }
+  }, primeraEtiqueta);
+
+  map.addLayer({
+    id: 'predios-hover',
+    type: 'fill',
+    source: 'predios',
+    'source-layer': 'predios',
+    paint: {
+      'fill-color': '#0a0a0a',
+      'fill-opacity': ['case',['boolean',['feature-state','hover'],false],0.25,0]
+    }
+  }, primeraEtiqueta);
+
+  // Contorno del predio seleccionado
+  map.addLayer({
+    id: 'predios-selected',
+    type: 'line',
+    source: 'predios',
+    'source-layer': 'predios',
+    paint: {
+      'line-color': '#0a0a0a',
+      'line-width': 2.5,
+      'line-opacity': ['case',['boolean',['feature-state','selected'],false],1,0]
+    }
+  }, primeraEtiqueta);
+
+  map.on('zoom', () => {
+    const z = map.getZoom();
+    document.getElementById('zoom-hint').style.display = z < 13 ? 'block' : 'none';
+  });
+});
+
+// Hover
+let hoveredId = null;
+map.on('mousemove', 'predios-fill', e => {
+  map.getCanvas().style.cursor = 'pointer';
+  if (e.features.length > 0) {
+    if (hoveredId !== null) {
+      map.setFeatureState({ source:'predios', sourceLayer:'predios', id: hoveredId }, { hover: false });
+    }
+    hoveredId = e.features[0].id;
+    map.setFeatureState({ source:'predios', sourceLayer:'predios', id: hoveredId }, { hover: true });
+  }
+});
+map.on('mouseleave', 'predios-fill', () => {
+  map.getCanvas().style.cursor = '';
+  if (hoveredId !== null) {
+    map.setFeatureState({ source:'predios', sourceLayer:'predios', id: hoveredId }, { hover: false });
+    hoveredId = null;
+  }
+});
+
+// Click en predio — muestra ficha + botón calculadora
+let selectedId = null;
+map.on('click', 'predios-fill', e => {
+  if (!e.features.length) return;
+  const feat = e.features[0];
+  const p = feat.properties;
+  const g = p.zona_g;
+  const color = COLORS[g] || '#ccc';
+  const tc = TEXT_COLORS[g] || '#000';
+
+  // Marcar como seleccionado
+  if (selectedId !== null) {
+    map.setFeatureState({ source:'predios', sourceLayer:'predios', id: selectedId }, { selected: false });
+  }
+  selectedId = feat.id;
+  map.setFeatureState({ source:'predios', sourceLayer:'predios', id: selectedId }, { selected: true });
+
+  // Área construible máxima
+  // V2: base (sin trámites) = lo que usa la calculadora; máximo = con incentivos
+  const ie = p.ie_max || IE_REF[g] || '—';
+  const ieBase = IE_REF[g];
+  const construible = (p.area_m2 && ieBase)
+    ? Math.round(p.area_m2 * ieBase).toLocaleString('es-GT') + ' m²'
+    : '—';
+  const construibleMax = (p.area_m2 && p.ie_max && p.ie_max > ieBase)
+    ? Math.round(p.area_m2 * p.ie_max).toLocaleString('es-GT') + ' m²'
+    : null;
+
+  // URL de la calculadora con datos del predio
+  const calcURL = buildCalcURL(p, g);
+  const url3D = build3DURL(p, g, feat);
+
+  document.getElementById('panel').innerHTML = `
+    <h3>Predio seleccionado</h3>
+
+    <div class="row">
+      <span class="lbl">NCM</span>
+      <span class="val" style="font-family:monospace;font-size:10px;letter-spacing:0.02em">${p.ncm || '—'}</span>
+    </div>
+    <div class="row">
+      <span class="lbl">Zona G</span>
+      <span class="badge" style="background:${color};color:${tc}">${g}</span>
+    </div>
+    <div class="row">
+      <span class="lbl">Uso</span>
+      <span class="val" style="font-size:10px">${DESCS[g] || '—'}</span>
+    </div>
+    <div class="row">
+      <span class="lbl">Zona municipal</span>
+      <span class="val">Zona ${p.zona || '—'}</span>
+    </div>
+    <div class="row">
+      <span class="lbl">Área del predio</span>
+      <span class="val">${p.area_m2 ? Number(p.area_m2).toLocaleString('es-GT') + ' m²' : '—'}</span>
+    </div>
+    <div class="row">
+      <span class="lbl">IE máx. (con incentivos)</span>
+      <span class="val">${p.ie_max != null ? p.ie_max + 'x' : '—'}</span>
+    </div>
+    <div class="row">
+      <span class="lbl">Medidas aprox.</span>
+      <span class="val">${p.ancho && p.largo ? Math.round(p.ancho) + ' × ' + Math.round(p.largo) + ' m' : '—'}</span>
+    </div>
+    ${p.regular != null && p.regular < 0.85 ? '<div class="row"><span class="lbl" style="text-transform:none;letter-spacing:0">Forma irregular: medidas aproximadas</span></div>' : ''}
+    <div class="row" style="border-bottom:none;margin-bottom:0;padding-bottom:0">
+      <span class="lbl">Altura permitida</span>
+      <span class="val">${p.alt_perm ? p.alt_perm + ' m' : '—'}</span>
+    </div>
+
+    <div class="metric">
+      <div class="metric-label">Área construible (base)</div>
+      <div class="metric-value">${construible}</div>
+      <div class="metric-sub">IE ${ieBase != null ? ieBase + 'x' : '—'} × ${p.area_m2 ? Number(p.area_m2).toLocaleString('es-GT') + ' m²' : '—'} de terreno${construibleMax ? '<br>Con incentivos: hasta ' + construibleMax + ' (IE ' + p.ie_max + 'x)' : ''}</div>
+    </div>
+
+    <a class="btn-calcular" href="${calcURL}" target="_blank" rel="noopener">
+      <span>Calcular potencial</span>
+      <span>→</span>
+    </a>
+    <a class="btn-calcular-sub" href="${url3D}" target="_blank" rel="noopener">
+      <span>Ver en 3D</span>
+      <span>→</span>
+    </a>
+    <a class="btn-calcular-sub" href="${calcURL}&modo=pro" target="_blank" rel="noopener">
+      <span>Abrir en modo Pro</span>
+      <span>→</span>
+    </a>
+  `;
+});
+
+// Click fuera de predio — limpiar panel
+map.on('click', e => {
+  const f = map.queryRenderedFeatures(e.point, { layers: ['predios-fill'] });
+  if (!f.length) {
+    if (selectedId !== null) {
+      map.setFeatureState({ source:'predios', sourceLayer:'predios', id: selectedId }, { selected: false });
+      selectedId = null;
+    }
+    document.getElementById('panel').innerHTML = `
+      <h3>Predio</h3>
+      <div class="hint">Hacé clic en un predio<br>para ver su ficha.</div>
+    `;
+  }
+});
+
+// Filtros leyenda
+document.querySelectorAll('.li[data-zona]').forEach(el => {
+  el.addEventListener('click', () => {
+    const zona = el.dataset.zona;
+    if (activeZonas.has(zona)) {
+      activeZonas.delete(zona);
+      el.classList.add('off');
+    } else {
+      activeZonas.add(zona);
+      el.classList.remove('off');
+    }
+    if (map.getLayer('predios-fill')) {
+      map.setFilter('predios-fill', buildFilter());
+      map.setFilter('predios-line', buildFilter());
+      map.setFilter('predios-hover', buildFilter());
+      map.setFilter('predios-selected', buildFilter());
+    }
+  });
+});
+</script>
+</body>
+</html>
